@@ -62,6 +62,97 @@ async function fetchManualRedirects(
   }
 }
 
+export async function fetchPageLocally(
+  url: string,
+  signal: AbortSignal,
+  format: FetchFormat,
+  cleanup: "none" | "defuddle" | "readability",
+  native: {
+    response?: Awaited<ReturnType<typeof fetchManualRedirects>> | undefined;
+  } = {},
+  headers: Record<string, string> = {},
+): Promise<FetchPage> {
+  try {
+    const { response, url: currentURL } =
+      native.response ??
+      (await fetchManualRedirects(
+        url,
+        signal,
+        {
+          Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+          "User-Agent": TARGET_USER_AGENT,
+          ...headers,
+        },
+        "local webfetch",
+        "webfetch-rotate",
+        10,
+      ));
+    native.response = undefined;
+    const contentType =
+      response.headers
+        .get("content-type")
+        ?.split(";", 1)[0]
+        ?.trim()
+        .toLowerCase() ?? "";
+    if (
+      contentType &&
+      !contentType.startsWith("text/") &&
+      !contentType.includes("html") &&
+      !contentType.includes("xml") &&
+      !contentType.includes("json")
+    ) {
+      await response.body?.cancel();
+      throw new Error(`local webfetch unsupported content type ${contentType}`);
+    }
+    const bytes = await readBodyLimited(
+      response,
+      10 * 1024 * 1024,
+      "local webfetch",
+    );
+    let html: string;
+    try {
+      html = new TextDecoder(
+        response.headers
+          .get("content-type")
+          ?.match(/charset\s*=\s*["']?([^;"'\s]+)/i)?.[1] || "utf-8",
+      ).decode(bytes);
+    } catch {
+      html = new TextDecoder().decode(bytes);
+    }
+    if (!html.trim()) throw new Error("empty content");
+    const source =
+      contentType.includes("html") ||
+      (!contentType && /<\/?[a-z][\w:-]*(?:\s[^<>]*?)?>/i.test(html))
+        ? "html"
+        : "text";
+    return {
+      url,
+      ...(currentURL !== url ? { finalURL: currentURL } : {}),
+      provider: "native",
+      metadata: { contentType, status: response.status },
+      ...(source === format && (source !== "html" || cleanup === "none")
+        ? { content: html, format: source }
+        : await (
+            await import("./cleanup")
+          ).convertContent(html, source, currentURL, format, cleanup)),
+    };
+  } catch (error) {
+    if (signal.aborted) throw error;
+    return {
+      url,
+      error: error instanceof Error ? error.message : String(error),
+      ...(error instanceof HTTPError
+        ? {
+            metadata: {
+              httpStatus: error.status,
+              retryable: error.retryable,
+            },
+          }
+        : {}),
+    };
+  }
+}
+
 export function newWebFetch(ctx: RotateContext): {
   fetch(input: {
     urls: URLList;
@@ -99,8 +190,9 @@ export function newWebFetch(ctx: RotateContext): {
         );
       }
 
-      let nativeResponse:
-        Awaited<ReturnType<typeof fetchManualRedirects>> | undefined;
+      const native: {
+        response?: Awaited<ReturnType<typeof fetchManualRedirects>> | undefined;
+      } = {};
       if (
         urls.length === 1 &&
         (mode === "native" ||
@@ -133,7 +225,7 @@ export function newWebFetch(ctx: RotateContext): {
               contentType === "image/svg+xml" ||
               contentType === "image/vnd.fastbidsheet"
             ) {
-              if (mode === "native") nativeResponse = { response, url };
+              if (mode === "native") native.response = { response, url };
               else await response.body?.cancel();
               break imageFetch;
             }
@@ -174,96 +266,7 @@ export function newWebFetch(ctx: RotateContext): {
       const fetchLocally = (targets: readonly string[]) =>
         mapConcurrent(
           targets,
-          async (url): Promise<FetchPage> => {
-            try {
-              const { response, url: currentURL } =
-                nativeResponse ??
-                (await fetchManualRedirects(
-                  url,
-                  signal,
-                  {
-                    Accept:
-                      "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
-                    "User-Agent": TARGET_USER_AGENT,
-                  },
-                  "local webfetch",
-                  "webfetch-rotate",
-                  10,
-                ));
-              nativeResponse = undefined;
-              const contentType =
-                response.headers
-                  .get("content-type")
-                  ?.split(";", 1)[0]
-                  ?.trim()
-                  .toLowerCase() ?? "";
-              if (
-                contentType &&
-                !contentType.startsWith("text/") &&
-                !contentType.includes("html") &&
-                !contentType.includes("xml") &&
-                !contentType.includes("json")
-              ) {
-                await response.body?.cancel();
-                throw new Error(
-                  `local webfetch unsupported content type ${contentType}`,
-                );
-              }
-              const bytes = await readBodyLimited(
-                response,
-                10 * 1024 * 1024,
-                "local webfetch",
-              );
-              let html: string;
-              try {
-                html = new TextDecoder(
-                  response.headers
-                    .get("content-type")
-                    ?.match(/charset\s*=\s*["']?([^;"'\s]+)/i)?.[1] || "utf-8",
-                ).decode(bytes);
-              } catch {
-                html = new TextDecoder().decode(bytes);
-              }
-              if (!html.trim()) throw new Error("empty content");
-              const source =
-                contentType.includes("html") ||
-                (!contentType && /<\/?[a-z][\w:-]*(?:\s[^<>]*?)?>/i.test(html))
-                  ? "html"
-                  : "text";
-              return {
-                url,
-                ...(currentURL !== url ? { finalURL: currentURL } : {}),
-                provider: "native",
-                metadata: { contentType, status: response.status },
-                ...(source === format &&
-                (source !== "html" || cleanup === "none")
-                  ? { content: html, format: source }
-                  : await (
-                      await import("./cleanup")
-                    ).convertContent(
-                      html,
-                      source,
-                      currentURL,
-                      format,
-                      cleanup,
-                    )),
-              };
-            } catch (error) {
-              if (signal.aborted) throw error;
-              return {
-                url,
-                error: error instanceof Error ? error.message : String(error),
-                ...(error instanceof HTTPError
-                  ? {
-                      metadata: {
-                        httpStatus: error.status,
-                        retryable: error.retryable,
-                      },
-                    }
-                  : {}),
-              };
-            }
-          },
+          (url) => fetchPageLocally(url, signal, format, cleanup, native),
           requestConcurrency(ctx, "fetch"),
           signal,
         );
