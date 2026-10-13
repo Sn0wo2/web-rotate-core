@@ -1,6 +1,6 @@
 {
   "name": "web-rotate-core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Any WebSearch/WebFetch provider interface gateway!",
   "type": "module",
   "files": [
@@ -20,8 +20,11 @@
     "@truto/turndown-plugin-gfm": "^1.0.5",
     "@types/turndown": "^5.0.5",
     "defuddle": "^0.19.5",
+    "duck-duck-scrape": "^2.2.7",
     "es-toolkit": "^1.52.0",
+    "fast-xml-parser": "^5.11.2",
     "file-type": "^22.1.1",
+    "google-sr": "^6.0.0",
     "linkedom": "^0.18.13",
     "marked": "^18.1.1",
     "turndown": "^7.2.0"

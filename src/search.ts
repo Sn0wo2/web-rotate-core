@@ -1,5 +1,10 @@
 import { chunk, compact, uniq } from "es-toolkit/array";
-import { parseHTML } from "linkedom";
+import { search as googleSearchAPI, OrganicResult } from "google-sr";
+import {
+  SafeSearchType,
+  search as duckDuckGoSearchAPI,
+} from "duck-duck-scrape";
+import { XMLParser } from "fast-xml-parser";
 import { PROVIDERS } from "./providers/constants";
 import { searchCount } from "./providers/utils";
 import { HTTPError, timedSignal } from "./core/http";
@@ -10,7 +15,6 @@ import {
   stringValue,
 } from "./core/config";
 import { mapConcurrent, requestConcurrency } from "./core/utils";
-import { fetchPageLocally } from "./fetch";
 import type {
   RotateContext,
   SearchQueries,
@@ -27,194 +31,106 @@ export type SearchOutcome = {
   errors?: { query: string; error: string }[];
 };
 
-const cleanSerpText = (value: string | null | undefined) =>
-  value?.replace(/\s+/g, " ").trim();
-
-function parseGoogleSerp(
-  html: string,
-  query: string,
-  limit: number,
-): SearchResult[] {
-  const { document } = parseHTML(html);
-  const seen = new Set<string>();
-  const results: SearchResult[] = [];
-  for (const anchor of document.querySelectorAll("a[href]")) {
-    if (!anchor.querySelector("h3")) continue;
-    const href = anchor.getAttribute("href") ?? "";
-    const target = /^https?:\/\//i.test(href)
-      ? href
-      : href.startsWith("/url?")
-        ? new URL(href, "https://www.google.com").searchParams.get("q")
-        : null;
-    if (!target) continue;
-    let parsed: URL;
-    try {
-      parsed = new URL(target);
-    } catch {
-      continue;
-    }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") continue;
-    if (/(?:^|\.)(?:google|gstatic|googleusercontent)\./i.test(parsed.hostname))
-      continue;
-    if (seen.has(parsed.href)) continue;
-    seen.add(parsed.href);
-    const container =
-      anchor.closest("div.g") ??
-      anchor.closest("div.MjjYud") ??
-      anchor.closest("div[data-sokoban-container]");
-    const snippet = cleanSerpText(
-      container?.querySelector("div.VwiC3b")?.textContent ??
-        container?.querySelector("span.aCOpRe")?.textContent,
-    );
-    const title = cleanSerpText(anchor.querySelector("h3")?.textContent);
-    results.push({
-      url: parsed.href,
-      ...(title ? { title } : {}),
-      ...(snippet ? { snippets: [snippet] } : {}),
-      provider: "google-serp",
-      queries: [query],
-    });
-    if (results.length >= limit) break;
-  }
-  return results;
-}
-
-function parseBingSerp(
-  html: string,
-  query: string,
-  limit: number,
-): SearchResult[] {
-  const { document } = parseHTML(html);
-  const seen = new Set<string>();
-  const results: SearchResult[] = [];
-  for (const item of document.querySelectorAll("li.b_algo")) {
-    const heading = item.querySelector("h2");
-    const anchor =
-      heading?.querySelector("a[href]") ?? item.querySelector("a[href]");
-    const href = anchor?.getAttribute("href") ?? "";
-    if (!href) continue;
-    let parsed: URL;
-    try {
-      parsed = new URL(href, "https://www.bing.com");
-    } catch {
-      continue;
-    }
-    let target = parsed;
-    if (
-      /(?:^|\.)bing\./i.test(parsed.hostname) &&
-      parsed.pathname.startsWith("/ck/a")
-    ) {
-      const encoded = parsed.searchParams.get("u");
-      if (!encoded?.startsWith("a1")) continue;
-      try {
-        target = new URL(
-          Buffer.from(
-            encoded.slice(2).replaceAll("-", "+").replaceAll("_", "/"),
-            "base64",
-          ).toString("utf8"),
-        );
-      } catch {
-        continue;
-      }
-    }
-    if (target.protocol !== "http:" && target.protocol !== "https:") continue;
-    if (/(?:^|\.)bing\./i.test(target.hostname)) continue;
-    if (seen.has(target.href)) continue;
-    seen.add(target.href);
-    const title = cleanSerpText(anchor?.textContent);
-    const snippet = cleanSerpText(item.querySelector("p")?.textContent);
-    results.push({
-      url: target.href,
-      ...(title ? { title } : {}),
-      ...(snippet ? { snippets: [snippet] } : {}),
-      provider: "bing-serp",
-      queries: [query],
-    });
-    if (results.length >= limit) break;
-  }
-  return results;
-}
-
-function parseDuckDuckGoSerp(
-  html: string,
-  query: string,
-  limit: number,
-): SearchResult[] {
-  const { document } = parseHTML(html);
-  const seen = new Set<string>();
-  const results: SearchResult[] = [];
-  for (const anchor of document.querySelectorAll("a.result__a")) {
-    let href = anchor.getAttribute("href") ?? "";
-    if (!href) continue;
-    if (href.startsWith("//")) href = `https:${href}`;
-    let parsed: URL;
-    try {
-      parsed = new URL(href, "https://duckduckgo.com");
-      href = parsed.searchParams.get("uddg") ?? "";
-    } catch {
-      continue;
-    }
-    if (!/^https?:\/\//i.test(href)) continue;
-    let target: URL;
-    try {
-      target = new URL(href);
-    } catch {
-      continue;
-    }
-    if (target.protocol !== "http:" && target.protocol !== "https:") continue;
-    if (/(?:^|\.)duckduckgo\./i.test(target.hostname)) continue;
-    if (seen.has(target.href)) continue;
-    seen.add(target.href);
-    const title = cleanSerpText(anchor.textContent);
-    const snippet = cleanSerpText(
-      anchor.closest("div.result")?.querySelector("a.result__snippet")
-        ?.textContent ??
-        anchor.closest("div.result")?.querySelector("div.result__snippet")
-          ?.textContent,
-    );
-    results.push({
-      url: target.href,
-      ...(title ? { title } : {}),
-      ...(snippet ? { snippets: [snippet] } : {}),
-      provider: "duckduckgo-serp",
-      queries: [query],
-    });
-    if (results.length >= limit) break;
-  }
-  return results;
-}
-
 const SERP_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+const xmlParser = new XMLParser({ ignoreAttributes: true });
+
 const SERP_ENGINES: {
-  buildURL: (query: string, count: number) => string;
-  parse: (html: string, query: string, limit: number) => SearchResult[];
+  search: (
+    query: string,
+    count: number,
+    signal: AbortSignal,
+  ) => Promise<SearchResult[]>;
 }[] = [
   {
-    buildURL: (query, count) => {
-      const url = new URL("https://www.google.com/search");
-      url.searchParams.set("q", query);
-      url.searchParams.set("num", String(Math.min(Math.max(count, 1), 20)));
-      url.searchParams.set("hl", "en");
-      return url.toString();
+    search: async (query, count, signal) => {
+      const results = await googleSearchAPI({
+        query,
+        parsers: [OrganicResult],
+        noPartialResults: true,
+        requestConfig: { signal: timedSignal(signal) },
+      });
+      return results.slice(0, count).flatMap((result) =>
+        result.link
+          ? [
+              {
+                url: result.link,
+                ...(result.title ? { title: result.title } : {}),
+                ...(result.description
+                  ? { snippets: [result.description] }
+                  : {}),
+                provider: "google-serp",
+                queries: [query],
+              },
+            ]
+          : [],
+      );
     },
-    parse: parseGoogleSerp,
   },
   {
-    buildURL: (query) =>
-      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
-    parse: parseDuckDuckGoSerp,
-  },
-  {
-    buildURL: (query, count) => {
+    search: async (query, count, signal) => {
       const url = new URL("https://www.bing.com/search");
       url.searchParams.set("q", query);
+      url.searchParams.set("format", "rss");
       url.searchParams.set("count", String(Math.min(Math.max(count, 1), 30)));
       url.searchParams.set("mkt", "en-US");
-      return url.toString();
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/rss+xml, application/xml, text/xml",
+          "User-Agent": SERP_USER_AGENT,
+        },
+        signal: timedSignal(signal),
+      });
+      const channel = xmlParser.parse(await response.text())?.rss?.channel;
+      const items: {
+        link?: string;
+        title?: string;
+        description?: string;
+      }[] = Array.isArray(channel?.item)
+        ? channel.item
+        : channel?.item
+          ? [channel.item]
+          : [];
+      if (!response.ok || !items.length)
+        throw new HTTPError(
+          response.status,
+          `bing rss returned ${response.status} with no items`,
+        );
+      return items.slice(0, count).flatMap((item) =>
+        item.link
+          ? [
+              {
+                url: item.link,
+                ...(item.title ? { title: item.title } : {}),
+                ...(item.description ? { snippets: [item.description] } : {}),
+                provider: "bing-serp",
+                queries: [query],
+              },
+            ]
+          : [],
+      );
     },
-    parse: parseBingSerp,
+  },
+  {
+    search: async (query, count) => {
+      const results = await duckDuckGoSearchAPI(
+        query,
+        { safeSearch: SafeSearchType.OFF },
+        {
+          headers: { "User-Agent": SERP_USER_AGENT },
+          timeout: 30_000,
+          response_timeout: 30_000,
+        },
+      );
+      return results.results.slice(0, count).map((result) => ({
+        url: result.url,
+        ...(result.title ? { title: result.title } : {}),
+        ...(result.description ? { snippets: [result.description] } : {}),
+        provider: "duckduckgo-serp",
+        queries: [query],
+      }));
+    },
   },
 ];
 
@@ -391,17 +307,7 @@ export function newWebSearch(ctx: RotateContext): {
           async (query): Promise<SearchResult[] | Error> => {
             for (const engine of SERP_ENGINES) {
               try {
-                const page = await fetchPageLocally(
-                  engine.buildURL(query, budget),
-                  signal,
-                  "html",
-                  "none",
-                  undefined,
-                  { "User-Agent": SERP_USER_AGENT },
-                );
-                if (page.error || !page.content)
-                  throw new Error(page.error ?? "empty SERP response");
-                const parsed = engine.parse(page.content, query, budget);
+                const parsed = await engine.search(query, budget, signal);
                 if (parsed.length) return parsed;
               } catch (error) {
                 if (signal.aborted) throw error;
