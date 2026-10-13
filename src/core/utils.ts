@@ -1,6 +1,10 @@
 import { configuredEnvironmentValue } from "./config";
 import type { RotateContext } from "./types";
 
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function requestConcurrency(
   ctx: RotateContext,
   capability: "search" | "fetch",

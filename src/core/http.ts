@@ -1,5 +1,20 @@
 export const REQUEST_TIMEOUT_MS = 30_000;
 
+export function assertHTTPURL(url: string, label = "url"): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`${label}: invalid URL`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`${label}: only http and https URLs are supported`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error(`${label}: URL credentials are not supported`);
+  }
+}
+
 export class HTTPError extends Error {
   readonly retryable: boolean;
   readonly invalidRequest: boolean;
