@@ -1,16 +1,16 @@
 import { fileTypeFromBuffer } from "file-type";
-import { readBodyLimited, timedSignal } from "./http";
-import { PROVIDERS, TARGET_USER_AGENT } from "./providers";
-import {
-  expandProviderRoutes,
-  orderedCandidates,
-  resolveMaxAttempts,
-} from "./rotation";
-import type { RotationState } from "./rotation";
-import { RotateConfigError, assertHTTPURL, configuredString } from "./util";
-import type { FetchFormat, FetchPage, RotateContext, URLList } from "./util";
-
-const MAX_IMAGE_BYTES = Math.floor((5 * 1024 * 1024 * 3) / 4);
+import { omit } from "es-toolkit/object";
+import { HTTPError, readBodyLimited, timedSignal } from "./core/http";
+import { PROVIDERS, TARGET_USER_AGENT } from "./providers/constants";
+import { orderedProviderRoutes, resolveMaxAttempts } from "./core/rotation";
+import { RotateConfigError, configuredString } from "./core/config";
+import { mapConcurrent, requestConcurrency } from "./core/utils";
+import type {
+  FetchFormat,
+  FetchPage,
+  RotateContext,
+  URLList,
+} from "./core/types";
 
 export type FetchOutcome =
   | { type: "image"; url: string; mime: string; base64: string }
@@ -27,7 +27,15 @@ async function fetchManualRedirects(
   const requestSignal = timedSignal(signal);
   let currentURL = url;
   for (let redirect = 0; ; redirect++) {
-    assertHTTPURL(currentURL, validationLabel);
+    const parsedURL = new URL(currentURL);
+    if (parsedURL.protocol !== "http:" && parsedURL.protocol !== "https:") {
+      throw new Error(
+        `${validationLabel}: only http and https URLs are supported`,
+      );
+    }
+    if (parsedURL.username || parsedURL.password) {
+      throw new Error(`${validationLabel}: URL credentials are not supported`);
+    }
     const response = await fetch(currentURL, {
       headers,
       redirect: "manual",
@@ -48,25 +56,26 @@ async function fetchManualRedirects(
     }
     if (!response.ok) {
       await response.body?.cancel();
-      throw new Error(`${label} HTTP ${response.status}`);
+      throw new HTTPError(response.status, `${label} HTTP ${response.status}`);
     }
     return { response, url: currentURL };
   }
 }
 
-const rotation: RotationState = { cursor: 0, failures: new Map() };
-
-export function createWebFetcher(ctx: RotateContext): {
+export function newWebFetch(ctx: RotateContext): {
   fetch(input: {
     urls: URLList;
     format: FetchFormat;
     signal: AbortSignal;
   }): Promise<FetchOutcome>;
 } {
+  const failures = new Map<string, number>();
   return {
     fetch: async ({ urls, format, signal }) => {
-      const mode =
-        configuredString(ctx, ["mode"], ["WEBFETCH_MODE"]) ?? "round-robin";
+      signal.throwIfAborted();
+      if (!urls.length)
+        throw new RotateConfigError("fetch URLs must not be empty");
+      const mode = configuredString(ctx, ["mode"], ["WEBFETCH_MODE"]) ?? "auto";
       const cleanup =
         configuredString(ctx, ["webfetchCleanup"], ["WEBFETCH_CLEANUP"]) ??
         "none";
@@ -79,8 +88,7 @@ export function createWebFetcher(ctx: RotateContext): {
           `webfetch-rotate: unsupported cleanup mode ${cleanup}`,
         );
       }
-      const explicit =
-        !["random", "round-robin", "auto"].includes(mode) && mode !== "native";
+      const explicit = mode !== "auto" && mode !== "native";
       if (
         explicit &&
         !PROVIDERS.some((provider) => provider.id === mode && provider.fetch)
@@ -91,12 +99,15 @@ export function createWebFetcher(ctx: RotateContext): {
         );
       }
 
+      let nativeResponse:
+        Awaited<ReturnType<typeof fetchManualRedirects>> | undefined;
       if (
-        mode === "native" ||
-        (["random", "round-robin", "auto"].includes(mode) &&
-          /\.(?:avif|bmp|gif|heic|heif|ico|jfif|jpe?g|png|tiff?|webp)$/i.test(
-            new URL(urls[0]).pathname,
-          ))
+        urls.length === 1 &&
+        (mode === "native" ||
+          (mode === "auto" &&
+            /\.(?:avif|bmp|gif|heic|heif|ico|jfif|jpe?g|png|tiff?|webp)$/i.test(
+              new URL(urls[0]).pathname,
+            )))
       ) {
         try {
           imageFetch: {
@@ -122,30 +133,19 @@ export function createWebFetcher(ctx: RotateContext): {
               contentType === "image/svg+xml" ||
               contentType === "image/vnd.fastbidsheet"
             ) {
-              await response.body?.cancel();
+              if (mode === "native") nativeResponse = { response, url };
+              else await response.body?.cancel();
               break imageFetch;
-            }
-            const contentLength = Number(
-              response.headers.get("content-length") || NaN,
-            );
-            if (
-              Number.isFinite(contentLength) &&
-              contentLength > MAX_IMAGE_BYTES
-            ) {
-              await response.body?.cancel();
-              throw new Error(
-                "native image exceeds the configured image payload limit",
-              );
             }
             const body = await readBodyLimited(
               response,
-              MAX_IMAGE_BYTES,
+              Math.floor((5 * 1024 * 1024 * 3) / 4),
               "native image",
             );
-            const detected = await fileTypeFromBuffer(body);
-            const mime =
-              detected &&
-              [
+            const mime = (await fileTypeFromBuffer(body))?.mime;
+            if (
+              !mime ||
+              ![
                 "image/jpeg",
                 "image/png",
                 "image/gif",
@@ -156,10 +156,9 @@ export function createWebFetcher(ctx: RotateContext): {
                 "image/avif",
                 "image/heic",
                 "image/heif",
-              ].includes(detected.mime)
-                ? detected.mime
-                : undefined;
-            if (!mime) break imageFetch;
+              ].includes(mime)
+            )
+              break imageFetch;
             const base64 = body.toBase64();
             if (base64.length > 5 * 1024 * 1024) {
               throw new Error(
@@ -173,22 +172,25 @@ export function createWebFetcher(ctx: RotateContext): {
         }
       }
       const fetchLocally = (targets: readonly string[]) =>
-        Promise.all(
-          targets.map(async (url): Promise<FetchPage> => {
+        mapConcurrent(
+          targets,
+          async (url): Promise<FetchPage> => {
             try {
-              const { response, url: currentURL } = await fetchManualRedirects(
-                url,
-                signal,
-                {
-                  Accept:
-                    "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
-                  "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
-                },
-                "local webfetch",
-                "webfetch-rotate",
-                10,
-              );
+              const { response, url: currentURL } =
+                nativeResponse ??
+                (await fetchManualRedirects(
+                  url,
+                  signal,
+                  {
+                    Accept:
+                      "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+                    "User-Agent": TARGET_USER_AGENT,
+                  },
+                  "local webfetch",
+                  "webfetch-rotate",
+                  10,
+                ));
+              nativeResponse = undefined;
               const contentType =
                 response.headers
                   .get("content-type")
@@ -212,34 +214,58 @@ export function createWebFetcher(ctx: RotateContext): {
                 10 * 1024 * 1024,
                 "local webfetch",
               );
-              const charset = response.headers
-                .get("content-type")
-                ?.match(/charset\s*=\s*["']?([^;"'\s]+)/i)?.[1];
               let html: string;
               try {
-                html = new TextDecoder(charset || "utf-8").decode(bytes);
+                html = new TextDecoder(
+                  response.headers
+                    .get("content-type")
+                    ?.match(/charset\s*=\s*["']?([^;"'\s]+)/i)?.[1] || "utf-8",
+                ).decode(bytes);
               } catch {
                 html = new TextDecoder().decode(bytes);
               }
+              if (!html.trim()) throw new Error("empty content");
+              const source =
+                contentType.includes("html") ||
+                (!contentType && /<\/?[a-z][\w:-]*(?:\s[^<>]*?)?>/i.test(html))
+                  ? "html"
+                  : "text";
               return {
                 url,
-                content: await (
-                  await import("./cleanup")
-                ).cleanHTML(
-                  html,
-                  currentURL,
-                  format,
-                  cleanup === "none" ? "readability" : cleanup,
-                ),
+                ...(currentURL !== url ? { finalURL: currentURL } : {}),
+                provider: "native",
+                metadata: { contentType, status: response.status },
+                ...(source === format &&
+                (source !== "html" || cleanup === "none")
+                  ? { content: html, format: source }
+                  : await (
+                      await import("./cleanup")
+                    ).convertContent(
+                      html,
+                      source,
+                      currentURL,
+                      format,
+                      cleanup,
+                    )),
               };
             } catch (error) {
               if (signal.aborted) throw error;
               return {
                 url,
                 error: error instanceof Error ? error.message : String(error),
+                ...(error instanceof HTTPError
+                  ? {
+                      metadata: {
+                        httpStatus: error.status,
+                        retryable: error.retryable,
+                      },
+                    }
+                  : {}),
               };
             }
-          }),
+          },
+          requestConcurrency(ctx, "fetch"),
+          signal,
         );
       if (mode === "native") {
         const pages = await fetchLocally(urls);
@@ -248,72 +274,98 @@ export function createWebFetcher(ctx: RotateContext): {
         return { type: "pages", pages };
       }
 
-      const pool = expandProviderRoutes(
-        PROVIDERS.flatMap((provider) =>
-          provider.fetch
-            ? [
-                {
-                  id: provider.id,
-                  keyEnv: provider.keyEnv,
-                  keyless: provider.fetch.keyless,
-                  fetch: provider.fetch.run,
-                  weight: provider.weight ?? 0,
-                },
-              ]
+      const candidates = orderedProviderRoutes(
+        PROVIDERS.flatMap(({ id, keyEnv, fetch }) =>
+          fetch && (format !== "html" || fetch.formats.includes("html"))
+            ? [{ id, keyEnv, ...fetch }]
             : [],
         ),
         ctx,
-      ).map(({ provider, key, index }) => ({
-        ...provider,
-        key,
-        routeID: `${provider.id}[${index}]`,
-      }));
-      const candidates = orderedCandidates(
-        pool,
-        mode,
-        rotation,
-        (route) => route.routeID,
-        (route) => route.id,
-        (value) => explicit && value === mode,
-        (route) => route.weight,
+        [mode],
+        failures,
       );
       const pagesByURL = new Map<string, FetchPage>();
       const errorsByURL = new Map<string, string>();
-      let pendingURLs = [...urls];
-      for (const route of candidates.slice(
-        0,
-        resolveMaxAttempts(ctx, "WEBFETCH_MAX_ATTEMPTS", candidates.length),
-      )) {
-        if (!pendingURLs.length) break;
+      const blocked = new Set<string>();
+      let pendingURLs = [...new Set(urls)];
+      const maxAttempts = resolveMaxAttempts(
+        ctx,
+        "WEBFETCH_MAX_ATTEMPTS",
+        candidates.length,
+      );
+      let attempts = 0;
+      for (const route of candidates) {
+        if (!pendingURLs.length || attempts >= maxAttempts) break;
+        if (blocked.has(route.id)) continue;
+        attempts++;
         try {
-          let routePages = await route.fetch(
+          const nativeFormat =
+            cleanup !== "none" && route.formats.includes("html")
+              ? "html"
+              : route.formats.includes(format)
+                ? format
+                : format === "markdown" && route.formats.includes("html")
+                  ? "html"
+                  : route.formats.includes("markdown")
+                    ? "markdown"
+                    : route.formats[0]!;
+          const routePages = await route.run(
             route.key,
             pendingURLs as URLList,
-            timedSignal(signal),
+            signal,
             ctx,
-            cleanup !== "none" ? "html" : format,
+            nativeFormat,
           );
-          if (cleanup !== "none") {
-            const { cleanHTML } = await import("./cleanup");
-            routePages = await Promise.all(
-              routePages.map(async (page) =>
-                page.content
-                  ? {
-                      ...page,
-                      content: await cleanHTML(
+          signal.throwIfAborted();
+          const convertedPages = await mapConcurrent(
+            routePages,
+            async (page) => {
+              if (!page.content) return page;
+              try {
+                if (!page.format)
+                  throw new Error(
+                    `${route.id} did not report its content format`,
+                  );
+                return {
+                  ...page,
+                  provider: route.id,
+                  ...(page.format === format &&
+                  (page.format !== "html" || cleanup === "none")
+                    ? {}
+                    : await (
+                        await import("./cleanup")
+                      ).convertContent(
                         page.content,
-                        page.url,
+                        page.format,
+                        page.finalURL ?? page.url,
                         format,
                         cleanup,
-                      ),
-                    }
-                  : page,
-              ),
-            );
-          }
-          const routePagesByURL = new Map(
-            routePages.map((page) => [page.url, page]),
+                      )),
+                };
+              } catch (error) {
+                if (signal.aborted) throw error;
+                return {
+                  ...omit(page, ["content"]),
+                  error: error instanceof Error ? error.message : String(error),
+                };
+              }
+            },
+            requestConcurrency(ctx, "fetch"),
+            signal,
           );
+          const routePagesByURL = new Map(
+            convertedPages.map((page) => [page.url, page]),
+          );
+          if (
+            convertedPages.some(
+              (page) =>
+                page.error &&
+                typeof page.metadata?.httpStatus === "number" &&
+                new HTTPError(page.metadata.httpStatus, page.error)
+                  .invalidRequest,
+            )
+          )
+            blocked.add(route.id);
           const nextURLs: string[] = [];
           for (const url of pendingURLs) {
             const page = routePagesByURL.get(url);
@@ -326,12 +378,14 @@ export function createWebFetcher(ctx: RotateContext): {
             }
           }
           if (nextURLs.length === pendingURLs.length)
-            rotation.failures.set(route.routeID, Date.now() + 60_000);
-          else rotation.failures.delete(route.routeID);
+            failures.set(route.routeID, Date.now() + 60_000);
+          else failures.delete(route.routeID);
           pendingURLs = nextURLs;
         } catch (error) {
-          if (signal.aborted) throw error;
-          rotation.failures.set(route.routeID, Date.now() + 60_000);
+          if (signal.aborted || error instanceof RotateConfigError) throw error;
+          if (error instanceof HTTPError && error.invalidRequest)
+            blocked.add(route.id);
+          failures.set(route.routeID, Date.now() + 60_000);
           for (const url of pendingURLs)
             errorsByURL.set(
               url,

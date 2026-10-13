@@ -1,13 +1,8 @@
-export { createWebFetcher } from "./fetch";
-export type { FetchOutcome } from "./fetch";
-export type { FetchPage } from "./util";
-export { createWebSearcher } from "./search";
-export type { SearchResult } from "./search";
-export { RESULTS_PER_SEARCH } from "./providers";
-export { RotateConfigError } from "./util";
+export { newWebFetch, type FetchOutcome } from "./fetch";
+export { newWebSearch, type SearchOutcome } from "./search";
 export type {
   FetchFormat,
+  FetchPage,
   RotateContext,
-  SearchQueries,
-  URLList,
-} from "./util";
+  SearchResult,
+} from "./core/types";

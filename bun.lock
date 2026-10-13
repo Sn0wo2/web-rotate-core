@@ -7,15 +7,17 @@
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.1",
         "@mozilla/readability": "^0.6.0",
+        "@truto/turndown-plugin-gfm": "^1.0.5",
+        "@types/turndown": "^5.0.5",
         "defuddle": "^0.19.5",
         "es-toolkit": "^1.52.0",
         "file-type": "^22.1.1",
         "linkedom": "^0.18.13",
+        "marked": "^18.1.1",
         "turndown": "^7.2.0",
       },
       "devDependencies": {
         "@types/bun": "^1.4.2",
-        "@types/turndown": "^5.0.5",
         "prettier": "^3.9.10",
         "typescript": "^7.0.2",
       },
@@ -32,9 +34,13 @@
 
     "@mozilla/readability": ["@mozilla/readability@0.6.0", "http://repo.nju.edu.cn/npm/@mozilla/readability/-/readability-0.6.0.tgz", {}, "sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ=="],
 
+    "@rollup/rollup-linux-x64-gnu": ["@rollup/rollup-linux-x64-gnu@4.59.1", "http://repo.nju.edu.cn/npm/@rollup/rollup-linux-x64-gnu/-/rollup-linux-x64-gnu-4.59.1.tgz", { "os": "linux", "cpu": "x64" }, "sha512-NQ9KyU1Anuy59L8+HHOKM++CoUxrQWrZWXRik4BJFm+7i5NP6q/SW43xIBr80zzt+PDBJ7LeNmloQGfa0JGk0w=="],
+
     "@tokenizer/inflate": ["@tokenizer/inflate@0.4.1", "http://repo.nju.edu.cn/npm/@tokenizer/inflate/-/inflate-0.4.1.tgz", { "dependencies": { "debug": "^4.4.3", "token-types": "^6.1.1" } }, "sha512-2mAv+8pkG6GIZiF1kNg1jAjh27IDxEPKwdGul3snfztFerfPGI1LjDezZp3i7BElXompqEtPmoPx6c2wgtWsOA=="],
 
     "@tokenizer/token": ["@tokenizer/token@0.3.0", "http://repo.nju.edu.cn/npm/@tokenizer/token/-/token-0.3.0.tgz", {}, "sha512-OvjF+z51L3ov0OyAU0duzsYuvO01PH7x4t6DJx+guahgTnBHkhJdG7soQeTSFLWN3efnHyibZ4Z8l2EuWwJN3A=="],
+
+    "@truto/turndown-plugin-gfm": ["@truto/turndown-plugin-gfm@1.0.5", "http://repo.nju.edu.cn/npm/@truto/turndown-plugin-gfm/-/turndown-plugin-gfm-1.0.5.tgz", { "optionalDependencies": { "@rollup/rollup-linux-x64-gnu": "4.59.1" }, "peerDependencies": { "turndown": "^7.0.0" } }, "sha512-h/xbPeTGLlFsKR9WTUEtdZwaM42N0CSy0bUUtyzSWSSUS7YUnOY9d5MkZKI/bsZ2mbfBih9A7by05GJoAeT8tQ=="],
 
     "@types/bun": ["@types/bun@1.4.3", "http://repo.nju.edu.cn/npm/@types/bun/-/bun-1.4.3.tgz", { "dependencies": { "bun-types": "1.4.3" } }, "sha512-N67Pqy8JXbAY/j0tNraS3V5mubGvc6rrrNDmDCtZLlFzccbUJPDb0tvgUBC5q4m8ybkP93Jcn1QB+RYQ6PvBhw=="],
 
@@ -217,6 +223,8 @@
     "json-schema-typed": ["json-schema-typed@8.0.2", "http://repo.nju.edu.cn/npm/json-schema-typed/-/json-schema-typed-8.0.2.tgz", {}, "sha512-fQhoXdcvc3V28x7C7BMs4P5+kNlgUURe2jmUT1T//oBRMDrqy1QPelJimwZGo7Hg9VPV3EQV5Bnq4hbFy2vetA=="],
 
     "linkedom": ["linkedom@0.18.13", "http://repo.nju.edu.cn/npm/linkedom/-/linkedom-0.18.13.tgz", { "dependencies": { "css-select": "^7.0.0", "cssom": "^0.5.0", "html-escaper": "^3.0.3", "htmlparser2": "^10.1.0", "uhyphen": "^0.2.0" }, "peerDependencies": { "canvas": ">= 2" }, "optionalPeers": ["canvas"] }, "sha512-ES/o9qotMpzpN2MHs+Iq/JcVoOj8Fa5wiQYrTdFpvAnwXL0g66XHHUc9WUMk6nAlBtGsFQ24ne+SYnvnaQ2FSw=="],
+
+    "marked": ["marked@18.1.1", "http://repo.nju.edu.cn/npm/marked/-/marked-18.1.1.tgz", { "bin": { "marked": "bin/marked.js" } }, "sha512-zEGgrtUG8crk+TrMacJSVABU4DYDDkS8uqgU3ohrn/2fW9C2AEfUrO3m6IhpIpQpl7YcVpiXXC9cSMWDANT3dg=="],
 
     "math-intrinsics": ["math-intrinsics@1.1.0", "http://repo.nju.edu.cn/npm/math-intrinsics/-/math-intrinsics-1.1.0.tgz", {}, "sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g=="],
 
