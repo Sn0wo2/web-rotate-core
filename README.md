@@ -30,7 +30,7 @@ And if you happen to be using `OpenCode2`, you can go straight for [`oc-web-rota
 
 ## Weights and Benchmark
 
-For WebSearch, the default routing weights are based on [Artificial Analysis's Search API evaluation](https://artificialanalysis.ai/agents/search-api).
+For WebSearch, the default routing weights are based on [Artificial Analysis's Search API Index](https://artificialanalysis.ai/agents/search-api).
 
 ---
 

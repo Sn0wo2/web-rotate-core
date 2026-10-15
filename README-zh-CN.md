@@ -30,7 +30,7 @@
 
 ## 权重和Benchmark
 
-在 WebSearch 方面，默认路由权重参考了 [Artificial Analysis 的 Search API 评测](https://artificialanalysis.ai/agents/search-api)
+在 WebSearch 方面，默认路由权重参考了 [Artificial Analysis 的 Search API Index](https://artificialanalysis.ai/agents/search-api)
 
 ---
 
