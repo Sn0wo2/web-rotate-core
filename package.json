@@ -1,7 +1,7 @@
 {
   "name": "web-rotate-core",
   "version": "0.3.0",
-  "description": "Any WebSearch/WebFetch provider interface gateway!",
+  "description": "One Gateway for All WebSearch/WebFetch Providers!",
   "type": "module",
   "files": [
     "src"
