@@ -2,6 +2,10 @@
 
 > One Gateway for All WebSearch/WebFetch Providers!
 
+## 语言
+
+- [README.md](./README.md)
+
 ## 来源小故事
 
 过去, 我们通过搜索引擎寻找信息; 如今, Agent 已经能够自主搜索、浏览网页, 获取外部世界的知识, 但 Agent 不再使用传统搜索引擎

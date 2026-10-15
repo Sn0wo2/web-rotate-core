@@ -2,6 +2,10 @@
 
 > One Gateway for All WebSearch/WebFetch Providers!
 
+## Language
+
+- [README-zh-CN.md](./README-zh-CN.md)
+
 ## Origin Story
 
 We used to find information through search engines; today, Agents can search and browse the web on their own, gathering knowledge from the outside world — but they no longer use traditional search engines.
