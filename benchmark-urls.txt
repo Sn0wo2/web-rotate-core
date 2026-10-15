@@ -1,0 +1,17 @@
+# webfetch benchmark corpus — one URL per line, lines starting with # are comments
+# long-form news article: main content vs nav / related-links / newsletter noise
+https://www.bbc.com/news/science-environment-65602519
+# dense structured page: large data tables, footnotes, infobox
+https://en.wikipedia.org/wiki/List_of_countries_by_GDP_(nominal)
+# docs page: heavy sidebar/TOC chrome + inline code samples
+https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions
+# code-block fidelity: fenced code, inline code, callouts
+https://react.dev/learn/render-and-commit
+# forum Q&A: question/answer structure, vote widgets, related sidebar
+https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array
+# JS-rendered page: raw HTML shell is empty, ground truth = exactly 10 quotes
+https://quotes.toscrape.com/js/
+# consent-wall + ads/newsletter noise on a major news site
+https://www.theguardian.com/australia-news/2023/oct/06/chatgpt-ai-allowed-australian-schools-2024
+# CJK extraction test (traditional Chinese, dense tables)
+https://zh.wikipedia.org/wiki/人工智慧

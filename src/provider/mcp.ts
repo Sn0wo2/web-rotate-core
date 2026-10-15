@@ -5,7 +5,9 @@ import {
 } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { REQUEST_TIMEOUT_MS, timedSignal } from "./http";
+import { LIB_VERSION, REQUEST_TIMEOUT_MS, timedSignal } from "../shared/http";
+
+export const MCP_FETCH_TIMEOUT_MS = 120_000;
 
 export async function mcpCall(
   url: string,
@@ -13,11 +15,12 @@ export async function mcpCall(
   tool: string,
   args: Record<string, unknown>,
   signal: AbortSignal,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<CallToolResult> {
-  const requestSignal = timedSignal(signal);
+  const requestSignal = timedSignal(signal, timeoutMs);
   for (let attempt = 0; ; attempt++) {
     const client = new Client(
-      { name: "web-rotate", version: "1.0.0" },
+      { name: "web-rotate-core", version: LIB_VERSION },
       { capabilities: {} },
     );
     const transport = new StreamableHTTPClientTransport(new URL(url), {
@@ -40,7 +43,7 @@ export async function mcpCall(
       const result = (await client.callTool(
         { name: tool, arguments: args },
         undefined,
-        { signal: requestSignal, timeout: REQUEST_TIMEOUT_MS },
+        { signal: requestSignal, timeout: timeoutMs },
       )) as CallToolResult;
       if (result.isError) {
         throw new Error(
@@ -62,4 +65,21 @@ export async function mcpCall(
       await client.close().catch(() => undefined);
     }
   }
+}
+
+export async function mcpJSON(
+  url: string,
+  headers: Record<string, string>,
+  tool: string,
+  args: Record<string, unknown>,
+  signal: AbortSignal,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<unknown> {
+  const result = await mcpCall(url, headers, tool, args, signal, timeoutMs);
+  return (
+    result.structuredContent ??
+    JSON.parse(
+      result.content.find((part) => part.type === "text")?.text ?? "null",
+    )
+  );
 }

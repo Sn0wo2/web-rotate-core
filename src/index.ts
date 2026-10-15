@@ -1,21 +1,23 @@
 export {
-  configuredEnvironmentValue,
+  DEFAULT_OPTIONS,
   RotateConfigError,
-  stringValue,
-} from "./core/config";
-export { assertHTTPURL } from "./core/http";
-export { errorMessage } from "./core/utils";
-export { searchCount } from "./providers/utils";
-export { newWebFetch as createWebFetcher, type FetchOutcome } from "./fetch";
-export {
-  newWebSearch as createWebSearcher,
-  type SearchOutcome,
-} from "./search";
+  type RotateOptions,
+} from "./shared/config";
+export { newWebFetch as createWebFetcher } from "./provider/fetch/fetch";
+export { newWebSearch as createWebSearcher } from "./provider/search/search";
+export { FETCH_PROVIDERS } from "./provider/fetch/index";
+export { SEARCH_PROVIDERS } from "./provider/search/index";
+export type { Provider } from "./provider/types";
 export type {
   FetchFormat,
+  FetchOutcome,
   FetchPage,
-  RotateContext,
-  SearchQueries,
+  FetchProvider,
+} from "./provider/fetch/types";
+export type {
+  SearchOutcome,
+  SearchProvider,
+  SearchResponse,
   SearchResult,
-  URLList,
-} from "./core/types";
+} from "./provider/search/types";
+export type { RotateContext, URLList } from "./shared/types";

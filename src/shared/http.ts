@@ -1,19 +1,10 @@
 export const REQUEST_TIMEOUT_MS = 30_000;
 
-export function assertHTTPURL(url: string, label = "url"): void {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error(`${label}: invalid URL`);
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(`${label}: only http and https URLs are supported`);
-  }
-  if (parsed.username || parsed.password) {
-    throw new Error(`${label}: URL credentials are not supported`);
-  }
-}
+export const LIB_VERSION = "0.3.0";
+export const USER_AGENT = `web-rotate-core/${LIB_VERSION}`;
+
+export const TARGET_USER_AGENT =
+  "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot";
 
 export class HTTPError extends Error {
   readonly retryable: boolean;
@@ -105,6 +96,7 @@ export async function apiJSON(
     body?: unknown;
     key?: string | undefined;
     headers?: Record<string, string>;
+    timeoutMs?: number;
   } = {},
 ): Promise<unknown> {
   const body = await checkedResponseText(
@@ -112,7 +104,7 @@ export async function apiJSON(
       method: init.body === undefined ? "GET" : "POST",
       headers: {
         Accept: "application/json",
-        "User-Agent": "opencode2-web-rotate/1.0.0",
+        "User-Agent": USER_AGENT,
         ...(init.body === undefined
           ? {}
           : { "Content-Type": "application/json" }),
@@ -120,7 +112,7 @@ export async function apiJSON(
         ...init.headers,
       },
       ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
-      signal: timedSignal(signal),
+      signal: timedSignal(signal, init.timeoutMs),
       redirect: "error",
     }),
     init.label ?? url,
