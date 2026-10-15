@@ -34,7 +34,7 @@ For WebSearch, the default routing weights are based on [Artificial Analysis's S
 
 ---
 
-For WebFetch, we use our own [WebFetch Benchmark](./BENCHMARK.md).
+For WebFetch, we use our own [WebFetch Benchmark](./benchmark/README.md).
 
 It uses `jev v1.13` as the judge model to score the results of each `WebFetch` provider.
 

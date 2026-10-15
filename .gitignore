@@ -112,6 +112,6 @@ dist
 # TernJS port file
 .tern-port
 
-benchmark-out/
+benchmark/out/
 .codegraph/
 nul

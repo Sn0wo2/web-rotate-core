@@ -10,7 +10,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "benchmark": "bun run benchmark.ts",
+    "benchmark": "bun run benchmark/run.ts",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

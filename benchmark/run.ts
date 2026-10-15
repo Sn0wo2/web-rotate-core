@@ -4,13 +4,12 @@ import {
   createWebFetcher,
   FETCH_PROVIDERS,
   RotateConfigError,
-} from "./src/index";
-import { orderedProviderRoutes } from "./src/provider/rotation";
-import type { FetchProvider } from "./src/provider/fetch/types";
-import { errorMessage, mapConcurrent } from "./src/shared/utils";
-import type { RotateContext } from "./src/shared/types";
+} from "../src/index";
+import { orderedProviderRoutes } from "../src/provider/rotation";
+import type { FetchProvider } from "../src/provider/fetch/types";
+import { errorMessage, mapConcurrent } from "../src/shared/utils";
+import type { RotateContext } from "../src/shared/types";
 
-const DEFAULT_BASE_URL = "https://ah.nix.me0wo.cc/v1";
 const DEFAULT_MODEL = "jev-1.13";
 const FETCH_CONCURRENCY = 2;
 const JUDGE_CONCURRENCY = 2;
@@ -63,7 +62,8 @@ notes:
   by spaces, commas, or semicolons for rotation.
   --env K=V sets library options verbatim (e.g. fetchConcurrency=1,
   mode=auto, webfetchCleanup=defuddle, maxAttempts=3).
-  judge env: TYPESAFE_API_KEY (required), TYPESAFE_BASE_URL, TYPESAFE_MODEL`;
+  judge env: TYPESAFE_API_KEY and TYPESAFE_BASE_URL (both required),
+  TYPESAFE_MODEL`;
 
 type Parsed = {
   _: string[];
@@ -94,7 +94,7 @@ function parseArgv(argv: string[]): Parsed {
     urls: undefined,
     reads: 1,
     retries: 3,
-    saveDir: "benchmark-out",
+    saveDir: "benchmark/out",
     timeout: 1200,
     json: false,
   };
@@ -302,11 +302,11 @@ type ScoreAnswer = { score?: number; confidence?: number };
 type Usage = { input_tokens?: number; output_tokens?: number };
 
 function judgeConfig(ctx: EnvContext): JudgeConfig {
-  const base = (
-    ctx.getOption("TYPESAFE_BASE_URL") ||
-    process.env.TYPESAFE_BASE_URL ||
-    DEFAULT_BASE_URL
-  ).replace(/\/+$/, "");
+  const rawBase =
+    ctx.getOption("TYPESAFE_BASE_URL") || process.env.TYPESAFE_BASE_URL;
+  if (!rawBase)
+    throw new RotateConfigError("TYPESAFE_BASE_URL is not configured");
+  const base = rawBase.replace(/\/+$/, "");
   const apiKey =
     ctx.getOption("TYPESAFE_API_KEY") || process.env.TYPESAFE_API_KEY;
   if (!apiKey)

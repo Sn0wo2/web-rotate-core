@@ -34,7 +34,7 @@
 
 ---
 
-WebFetch 方面我们使用了自己的 [WebFetch Benchmark](./BENCHMARK.md)
+WebFetch 方面我们使用了自己的 [WebFetch Benchmark](./benchmark/README.md)
 
 使用 `jev v1.13` 来作为裁判模型, 对各个 `WebFetch` 提供商的结果进行打分
 

@@ -88,6 +88,6 @@ bun run benchmark <url> [url2 ...] [--urls file] [--providers id,id2]
 ```
 
 - Provider keys come from env, one variable per provider: `<PROVIDER>_API_KEY` (no aliases); a value may hold several keys separated by spaces, commas, or semicolons for rotation.
-- Judge env: `TYPESAFE_API_KEY` (required), `TYPESAFE_BASE_URL`, `TYPESAFE_MODEL` (default `jev-1.13`).
+- Judge env: `TYPESAFE_API_KEY` and `TYPESAFE_BASE_URL` (both required), `TYPESAFE_MODEL` (default `jev-1.13`).
 - `--env K=V` sets library options verbatim (e.g. `fetchConcurrency=1`, `mode=auto`, `webfetchCleanup=defuddle`, `maxAttempts=3`).
 - Results are written to `<save-dir>/<timestamp>/results.json` with per-candidate dumps under `candidates/` and judge audits under `judge/`.
