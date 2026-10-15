@@ -1,23 +1,22 @@
 import get from "es-toolkit/compat/get";
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
+import { z } from "zod";
 import { apiJSON } from "../../shared/http";
-import { providerOptions, stringValue } from "../../shared/config";
+import { stringValue } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { requireKey, urlParams } from "../utils";
 import { searchCount, searchResponse } from "./utils";
 
-type BraveSearchOptions = { api?: string };
+const settingsSchema = z.looseObject({ api: z.string().optional() });
+type BraveSearchSettings = z.output<typeof settingsSchema>;
 
-export const brave: SearchProvider = {
+export const brave = {
   id: "brave",
   weight: 75,
-  run: async (key, queries, signal, ctx) => {
+  options: settingsSchema,
+  run: async ({ settings, key, queries, signal, globals }) => {
     const token = requireKey("brave", key);
-    const { api, ...rest } = providerOptions<BraveSearchOptions>(
-      ctx,
-      "brave",
-      "search",
-    );
+    const { api, ...rest } = settings;
     const payload = await apiJSON(
       (() => {
         if (api === "web") {
@@ -25,7 +24,7 @@ export const brave: SearchProvider = {
             new URL("https://api.search.brave.com/res/v1/web/search"),
             { extra_snippets: true, ...rest },
           );
-          endpoint.searchParams.set("count", String(searchCount(ctx, 20)));
+          endpoint.searchParams.set("count", String(searchCount(globals, 20)));
           endpoint.searchParams.set("result_filter", "web");
           endpoint.searchParams.set("q", queries[0]);
           return endpoint.toString();
@@ -33,7 +32,7 @@ export const brave: SearchProvider = {
         const endpoint = urlParams(
           new URL("https://api.search.brave.com/res/v1/llm/context"),
           {
-            maximum_number_of_urls: searchCount(ctx, 50),
+            maximum_number_of_urls: searchCount(globals, 50),
             maximum_number_of_tokens: 1024,
             maximum_number_of_tokens_per_url: 512,
             maximum_number_of_snippets: 16,
@@ -43,7 +42,7 @@ export const brave: SearchProvider = {
             ...rest,
           },
         );
-        endpoint.searchParams.set("count", String(searchCount(ctx, 50)));
+        endpoint.searchParams.set("count", String(searchCount(globals, 50)));
         endpoint.searchParams.set("q", queries[0]);
         return endpoint.toString();
       })(),
@@ -78,4 +77,4 @@ export const brave: SearchProvider = {
         : payload,
     );
   },
-};
+} satisfies SearchProvider<BraveSearchSettings>;

@@ -1,23 +1,27 @@
 import Exa from "exa-js";
-import { providerOptions } from "../../shared/config";
+import { z } from "zod";
 import type { SearchProvider } from "./types";
 import { mcpCall } from "../mcp";
 import { sdkRequest } from "../utils";
 import { searchCount, searchResponse } from "./utils";
 
-type ExaSearchOptions = { contents?: Record<string, unknown> };
+const settingsSchema = z.looseObject({
+  contents: z.record(z.string(), z.unknown()).optional(),
+});
+type ExaSearchSettings = z.output<typeof settingsSchema>;
 
-export const exa: SearchProvider = {
+export const exa = {
   id: "exa",
   weight: 73,
   keyless: true,
-  run: async (key, queries, signal, ctx) => {
+  options: settingsSchema,
+  run: async ({ settings, key, queries, signal, globals }) => {
     if (!key) {
       const result = await mcpCall(
         "https://mcp.exa.ai/mcp",
         {},
         "web_search_exa",
-        { query: queries[0], numResults: searchCount(ctx) },
+        { query: queries[0], numResults: searchCount(globals) },
         signal,
       );
       if (result.structuredContent != null)
@@ -40,19 +44,18 @@ export const exa: SearchProvider = {
         ? searchResponse(blocks)
         : { results: [], ...(text ? { metadata: { text } } : {}) };
     }
-    const options = providerOptions<ExaSearchOptions>(ctx, "exa", "search");
     const client = new Exa(key);
     const payload = await sdkRequest(signal, () =>
       client.search(queries[0], {
         type: "auto",
-        ...options,
-        numResults: searchCount(ctx),
+        ...settings,
+        numResults: searchCount(globals),
         contents: {
           highlights: { maxCharacters: 1000 },
-          ...options.contents,
+          ...settings.contents,
         },
       }),
     );
     return searchResponse(payload);
   },
-};
+} satisfies SearchProvider<ExaSearchSettings>;

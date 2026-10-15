@@ -1,14 +1,13 @@
 import { apiJSON } from "../../shared/http";
-import { providerOptions } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { requireKey } from "../utils";
 import { searchCount, searchResponse } from "./utils";
 
-export const diffbot: SearchProvider = {
+export const diffbot = {
   id: "diffbot",
   weight: 50,
   batchSize: 5,
-  run: async (key, queries, signal, ctx) => {
+  run: async ({ settings, key, queries, signal, globals }) => {
     const payload = await apiJSON(
       "https://llm.diffbot.com/api/v1/web_search",
       signal,
@@ -16,13 +15,13 @@ export const diffbot: SearchProvider = {
         label: "diffbot",
         body: {
           maxTokens: 2000,
-          ...providerOptions(ctx, "diffbot", "search"),
+          ...settings,
           text: queries,
-          size: searchCount(ctx),
+          size: searchCount(globals),
         },
         headers: { Authorization: `Bearer ${requireKey("diffbot", key)}` },
       },
     );
     return searchResponse(payload);
   },
-};
+} satisfies SearchProvider;

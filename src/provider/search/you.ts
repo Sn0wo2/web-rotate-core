@@ -1,22 +1,21 @@
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { apiJSON } from "../../shared/http";
-import { providerOptions } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { requireKey } from "../utils";
 import { searchCount, searchResponse } from "./utils";
 
-export const you: SearchProvider = {
+export const you = {
   id: "you",
   weight: 74,
-  run: async (key, queries, signal, ctx) => {
+  run: async ({ settings, key, queries, signal, globals }) => {
     const payload = await apiJSON("https://ydc-index.io/v1/search", signal, {
       label: "you",
       body: {
         extraction: { extraction_mode: "highlights" },
         safesearch: "moderate",
-        ...providerOptions(ctx, "you", "search"),
+        ...settings,
         query: queries[0],
-        count: searchCount(ctx),
+        count: searchCount(globals),
       },
       headers: { "X-API-Key": requireKey("you", key) },
     });
@@ -38,4 +37,4 @@ export const you: SearchProvider = {
     });
     return searchResponse(payload, items);
   },
-};
+} satisfies SearchProvider;

@@ -1,22 +1,21 @@
 import get from "es-toolkit/compat/get";
-import { providerOptions } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { bearer } from "../utils";
 import { restSearch, searchCount } from "./utils";
 
-export const octen: SearchProvider = {
+export const octen = {
   id: "octen",
   weight: 80,
-  run: restSearch(
+  run: restSearch<Record<string, unknown>>(
     "https://api.octen.ai/search",
-    (queries, ctx) => ({
+    ({ settings, queries, globals }) => ({
       highlight: { enable: true, max_tokens: 300 },
       format: "text",
-      ...providerOptions(ctx, "octen", "search"),
+      ...settings,
       query: queries[0],
-      count: searchCount(ctx),
+      count: searchCount(globals),
     }),
     bearer,
     (payload) => get(payload, "data.results"),
   ),
-};
+} satisfies SearchProvider;

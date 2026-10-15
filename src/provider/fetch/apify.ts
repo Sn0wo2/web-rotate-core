@@ -1,20 +1,19 @@
 import { ApifyClient } from "apify-client";
-import { providerOptions, stringValue } from "../../shared/config";
+import { z } from "zod";
+import { stringValue } from "../../shared/config";
 import type { FetchProvider } from "./types";
 import { requireKey, sdkRequest } from "../utils";
 
-type ApifyFetchOptions = { actorId?: string };
+const settingsSchema = z.looseObject({ actorId: z.string().optional() });
+type ApifyFetchSettings = z.output<typeof settingsSchema>;
 
-export const apify: FetchProvider = {
+export const apify = {
   id: "apify",
   weight: 65,
   formats: ["html", "markdown", "text"],
-  run: async (key, urls, signal, ctx, format) => {
-    const { actorId, ...options } = providerOptions<ApifyFetchOptions>(
-      ctx,
-      "apify",
-      "fetch",
-    );
+  options: settingsSchema,
+  run: async ({ settings, key, urls, signal, format }) => {
+    const { actorId, ...options } = settings;
     const client = new ApifyClient({ token: requireKey("apify", key) });
     const run = await sdkRequest(
       signal,
@@ -65,4 +64,4 @@ export const apify: FetchProvider = {
       return { url, error: stringValue(item.error) ?? "empty content" };
     });
   },
-};
+} satisfies FetchProvider<ApifyFetchSettings>;

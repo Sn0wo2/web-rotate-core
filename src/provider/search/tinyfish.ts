@@ -1,16 +1,15 @@
 import { apiJSON } from "../../shared/http";
-import { providerOptions } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { requireKey, urlParams } from "../utils";
 import { searchResponse } from "./utils";
 
-export const tinyfish: SearchProvider = {
+export const tinyfish = {
   id: "tinyfish",
   weight: 72,
-  run: async (key, queries, signal, ctx) => {
+  run: async ({ settings, key, queries, signal }) => {
     const endpoint = urlParams(
       new URL("https://api.search.tinyfish.ai"),
-      { domain_type: "web", ...providerOptions(ctx, "tinyfish", "search") },
+      { domain_type: "web", ...settings },
       (_name, value) => (Array.isArray(value) ? value.join(",") : undefined),
     );
     endpoint.searchParams.set("query", queries[0]);
@@ -20,4 +19,4 @@ export const tinyfish: SearchProvider = {
       }),
     );
   },
-};
+} satisfies SearchProvider;

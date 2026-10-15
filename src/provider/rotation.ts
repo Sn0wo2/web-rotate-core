@@ -1,46 +1,94 @@
-import { option, stringList } from "../shared/config";
-import type { RotateContext } from "../shared/types";
-import { compact, orderBy, uniq, uniqBy, zip } from "es-toolkit/array";
-import type { Provider } from "./types";
+import { compact, orderBy, uniq, zip } from "es-toolkit/array";
+import { z } from "zod";
+import { RotateConfigError, stringList } from "../shared/config";
+import type { Globals } from "../shared/config";
+import type { Provider, ProviderEntry, ProviderRoute } from "./types";
 
-export function orderedProviderRoutes<T extends Provider>(
-  providers: readonly T[],
-  ctx: RotateContext,
-  modes: readonly string[],
-  failures: ReadonlyMap<string, number>,
-) {
-  const groups = providers.map((provider) => {
-    const keys = stringList(ctx.getOption(`${provider.id}Keys`));
-    const keyless =
-      provider.keyless && (provider.keylessEnabled?.(ctx) ?? true)
-        ? [undefined]
-        : [];
-    const keyed = uniq(keys);
-    return (
-      option(ctx, "prefer") === "keyless"
-        ? [...keyless, ...keyed]
-        : [...keyed, ...keyless]
-    ).map((key, index) => ({
-      ...provider,
-      key,
-      routeID: `${provider.id}[${index}]`,
-    }));
-  });
-  const pool = compact(zip(...groups).flat());
-  const now = Date.now();
-  const routes = modes.flatMap((mode) => {
-    const selected =
-      mode === "auto" ? pool : pool.filter((route) => route.id === mode);
-    const ready = selected.filter(
-      (route) => (failures.get(route.routeID) ?? 0) <= now,
+export type ParsedEntry = {
+  keys: (string | undefined)[];
+  settings: Record<string, unknown>;
+  weight: number;
+};
+
+export function resolveProviderEntries<P extends Provider<unknown>>(
+  providers: readonly P[],
+  config: Readonly<Record<string, ProviderEntry>> | undefined,
+  label: string,
+): Map<string, ParsedEntry> {
+  const byID = new Map(providers.map((provider) => [provider.id, provider]));
+  const slots =
+    config ??
+    Object.fromEntries(
+      providers.map((provider) => [provider.id, {} as ProviderEntry]),
     );
-    return orderBy(ready.length ? ready : selected, ["weight"], ["desc"]);
-  });
-  return modes.length === 1 ? routes : uniqBy(routes, (route) => route.routeID);
+  const entries = new Map<string, ParsedEntry>();
+  for (const [id, entry] of Object.entries(slots)) {
+    const provider = byID.get(id);
+    if (!provider)
+      throw new RotateConfigError(
+        `${label} provider "${id}" is not registered`,
+        "unsupported-provider",
+      );
+    const { keys, weight, ...settings } = entry;
+    let resolved: Record<string, unknown> = settings;
+    if (provider.options) {
+      const parsed = provider.options.safeParse(settings);
+      if (!parsed.success)
+        throw new RotateConfigError(
+          `invalid settings for ${label} provider "${id}": ${z.prettifyError(parsed.error)}`,
+        );
+      resolved = parsed.data as Record<string, unknown>;
+    }
+    entries.set(id, {
+      keys: uniq(stringList(keys)),
+      settings: resolved,
+      weight: weight ?? provider.weight,
+    });
+  }
+  return entries;
 }
 
-export function resolveMaxAttempts(ctx: RotateContext, routes: number): number {
-  const value = Number(option(ctx, "maxAttempts"));
-  const attempts = Number.isFinite(value) && value > 0 ? value : 3;
-  return Math.max(1, Math.min(Math.floor(attempts), routes));
+export function providerRoutes<P extends Provider<unknown>>(
+  providers: readonly P[],
+  entries: ReadonlyMap<string, ParsedEntry>,
+  globals: Globals,
+): ProviderRoute<P>[] {
+  const groups = providers
+    .filter((provider) => entries.has(provider.id))
+    .map((provider) => {
+      const entry = entries.get(provider.id)!;
+      const keyed = uniq(entry.keys);
+      const keyless =
+        provider.keyless &&
+        (provider.keylessEnabled?.(entry.settings, globals) ?? true)
+          ? [undefined]
+          : [];
+      return (
+        globals.prefer === "keyless"
+          ? [...keyless, ...keyed]
+          : [...keyed, ...keyless]
+      ).map((key, index) => ({
+        ...provider,
+        key,
+        settings: entry.settings,
+        weight: entry.weight,
+        routeID: `${provider.id}[${index}]`,
+      }));
+    });
+  return compact(zip(...groups).flat());
+}
+
+export function selectRoutes<P extends Provider<unknown>>(
+  pool: readonly ProviderRoute<P>[],
+  failures: ReadonlyMap<string, number>,
+): ProviderRoute<P>[] {
+  const now = Date.now();
+  const ready = pool.filter(
+    (route) => (failures.get(route.routeID) ?? 0) <= now,
+  );
+  return orderBy(ready.length ? ready : pool, ["weight"], ["desc"]);
+}
+
+export function resolveMaxAttempts(globals: Globals, routes: number): number {
+  return Math.max(1, Math.min(globals.maxAttempts, routes));
 }

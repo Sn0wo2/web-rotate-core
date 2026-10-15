@@ -1,22 +1,21 @@
-import { providerOptions } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { bearer } from "../utils";
 import { restSearch, searchCount } from "./utils";
 
-export const nimble: SearchProvider = {
+export const nimble = {
   id: "nimble",
   weight: 72,
-  run: restSearch(
+  run: restSearch<Record<string, unknown>>(
     "https://sdk.nimbleway.com/v2/search",
-    (queries, ctx) => ({
+    ({ settings, queries, globals }) => ({
       search_depth: "standard",
       focus: "general",
       output_format: "plain_text",
       full_content: false,
-      ...providerOptions(ctx, "nimble", "search"),
+      ...settings,
       query: queries[0],
-      max_results: searchCount(ctx),
+      max_results: searchCount(globals),
     }),
     bearer,
   ),
-};
+} satisfies SearchProvider;

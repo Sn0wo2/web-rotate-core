@@ -1,17 +1,15 @@
 import { tavily as tavilyApi } from "@tavily/core";
-import { providerOptions } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { mcpJSON } from "../mcp";
 import { sdkRequest } from "../utils";
 import { searchCount, searchResponse } from "./utils";
 
-export const tavily: SearchProvider = {
+export const tavily = {
   id: "tavily",
   weight: 67,
   keyless: true,
-  run: async (key, queries, signal, ctx) => {
-    const options = providerOptions(ctx, "tavily", "search");
-    if (key && !Object.keys(options).length) {
+  run: async ({ settings, key, queries, signal, globals }) => {
+    if (key && !Object.keys(settings).length) {
       const payload = await mcpJSON(
         `https://mcp.tavily.com/mcp/?tavilyApiKey=${key}`,
         {},
@@ -19,7 +17,7 @@ export const tavily: SearchProvider = {
         {
           query: queries[0],
           search_depth: "basic",
-          max_results: searchCount(ctx, 20),
+          max_results: searchCount(globals, 20),
         },
         signal,
       );
@@ -37,10 +35,10 @@ export const tavily: SearchProvider = {
         includeRawContent: false,
         autoParameters: false,
         topic: "general",
-        maxResults: searchCount(ctx, 20),
-        ...options,
+        maxResults: searchCount(globals, 20),
+        ...settings,
       }),
     );
     return searchResponse(response);
   },
-};
+} satisfies SearchProvider;

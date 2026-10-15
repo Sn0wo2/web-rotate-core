@@ -2,13 +2,14 @@ import { clamp } from "es-toolkit/math";
 import { compact } from "es-toolkit/array";
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { apiJSON } from "../../shared/http";
-import { option, stringValue } from "../../shared/config";
-import type { RotateContext, URLList } from "../../shared/types";
+import type { Globals } from "../../shared/config";
+import { stringValue } from "../../shared/config";
+import type { URLList } from "../../shared/types";
 import type { SearchProvider, SearchResponse, SearchResult } from "./types";
 import { firstList, responseMetadata } from "../utils";
 
-export function searchCount(ctx: RotateContext, maximum = 100): number {
-  return clamp(option(ctx, "searchResults"), 1, maximum);
+export function searchCount(globals: Globals, maximum = 100): number {
+  return clamp(globals.searchResults, 1, maximum);
 }
 
 const URL_KEYS = ["url", "link", "pageUrl", "page_url"] as const;
@@ -152,15 +153,15 @@ export function searchResponse(
   };
 }
 
-export function restSearch(
+export function restSearch<S>(
   url: string,
-  body: (queries: URLList, ctx: RotateContext) => unknown,
+  body: (input: { settings: S; queries: URLList; globals: Globals }) => unknown,
   headers: (key: string | undefined) => Record<string, string>,
   select?: (payload: unknown) => unknown,
-): SearchProvider["run"] {
-  return async (key, queries, signal, ctx) => {
+): SearchProvider<S>["run"] {
+  return async ({ settings, queries, signal, globals, key }) => {
     const payload = await apiJSON(url, signal, {
-      body: body(queries, ctx),
+      body: body({ settings, queries, globals }),
       headers: headers(key),
     });
     return searchResponse(payload, select?.(payload));

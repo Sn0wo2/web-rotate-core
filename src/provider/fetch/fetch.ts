@@ -1,13 +1,20 @@
 import { omit } from "es-toolkit/object";
 import { HTTPError } from "../../shared/http";
-import { RotateConfigError, option } from "../../shared/config";
+import { RotateConfigError, globalsSchema } from "../../shared/config";
+import type { Globals } from "../../shared/config";
 import {
   errorMessage,
   mapConcurrent,
   requestConcurrency,
 } from "../../shared/utils";
-import type { RotateContext, URLList } from "../../shared/types";
-import { orderedProviderRoutes, resolveMaxAttempts } from "../rotation";
+import type { URLList } from "../../shared/types";
+import {
+  providerRoutes,
+  resolveMaxAttempts,
+  resolveProviderEntries,
+  selectRoutes,
+} from "../rotation";
+import type { ProviderEntry } from "../types";
 import { FETCH_PROVIDERS } from "./index";
 import { fetchImage } from "./image";
 import type {
@@ -15,11 +22,42 @@ import type {
   FetchOutcome,
   FetchPage,
   FetchProvider,
+  FetchProviderConfigBase,
 } from "./types";
 
-export function newWebFetch(
-  ctx: RotateContext,
-  providers: readonly FetchProvider[] = FETCH_PROVIDERS,
+export type FetchProviderConfig<P extends readonly FetchProvider[] = []> =
+  FetchProviderConfigBase<typeof FETCH_PROVIDERS> &
+    FetchProviderConfigBase<NoInfer<P>> & {
+      cleanup?: "none" | "defuddle" | undefined;
+      prefer?: "keyed" | "keyless" | undefined;
+      concurrency?: number | undefined;
+      maxAttempts?: number | undefined;
+    };
+
+export type DefaultFetchProviderConfig = FetchProviderConfig;
+
+export const DEFAULT_FETCH_PROVIDER_CONFIG: DefaultFetchProviderConfig = {
+  tavily: {},
+  parallel: {},
+  you: {},
+  exa: {},
+  hyperbrowser: {},
+  firecrawl: {},
+  tinyfish: {},
+  jina: {},
+  scrapingant: {},
+  scrapingbee: {},
+  scrapfly: {},
+  diffbot: {},
+  brightdata: {},
+  apify: {},
+  linkup: {},
+  native: {},
+};
+
+export function createWebFetcher<P extends readonly FetchProvider[] = []>(
+  config: FetchProviderConfig<P> = {},
+  implementations?: P,
 ): {
   fetch(input: {
     urls: URLList;
@@ -27,45 +65,44 @@ export function newWebFetch(
     signal: AbortSignal;
   }): Promise<FetchOutcome>;
 } {
+  const globals: Globals = globalsSchema.parse(config);
+  const registry = new Map<string, FetchProvider>();
+  for (const provider of [...FETCH_PROVIDERS, ...(implementations ?? [])])
+    registry.set(provider.id, provider);
+  const enabled = [...registry.values()];
+  const entries = resolveProviderEntries(
+    enabled,
+    config.providers as Record<string, ProviderEntry> | undefined,
+    "fetch",
+  );
+  const pool = providerRoutes(enabled, entries, globals);
   const failures = new Map<string, number>();
+  const nativeOnly = entries.size === 1 && entries.has("native");
   return {
     fetch: async ({ urls, format, signal }) => {
       signal.throwIfAborted();
       if (!urls.length)
         throw new RotateConfigError("fetch URLs must not be empty");
-      const mode = option(ctx, "mode");
-      const cleanup = option(ctx, "webfetchCleanup");
-      if (cleanup !== "none" && cleanup !== "defuddle") {
-        throw new RotateConfigError(
-          `webfetch-rotate: unsupported cleanup mode ${cleanup}`,
-        );
-      }
-      if (
-        mode !== "auto" &&
-        !providers.some((provider) => provider.id === mode)
-      ) {
-        throw new RotateConfigError(
-          `webfetch-rotate: unsupported provider or mode ${mode}`,
-          "unsupported-mode",
-        );
-      }
 
-      const image = await fetchImage(urls, mode, signal);
+      const image = await fetchImage(
+        urls,
+        signal,
+        entries.has("native"),
+        nativeOnly,
+      );
       if (image) return image;
 
-      const candidates = orderedProviderRoutes(
-        providers.filter(
-          (provider) => format !== "html" || provider.formats.includes("html"),
+      const candidates = selectRoutes(
+        pool.filter(
+          (route) => format !== "html" || route.formats.includes("html"),
         ),
-        ctx,
-        [mode],
         failures,
       );
       const pagesByURL = new Map<string, FetchPage>();
       const errorsByURL = new Map<string, string>();
       const blocked = new Set<string>();
       let pendingURLs = [...new Set(urls)];
-      const maxAttempts = resolveMaxAttempts(ctx, candidates.length);
+      const maxAttempts = resolveMaxAttempts(globals, candidates.length);
       let attempts = 0;
       for (const route of candidates) {
         if (!pendingURLs.length || attempts >= maxAttempts) break;
@@ -73,7 +110,7 @@ export function newWebFetch(
         attempts++;
         try {
           const nativeFormat =
-            cleanup !== "none" && route.formats.includes("html")
+            globals.cleanup !== "none" && route.formats.includes("html")
               ? "html"
               : route.formats.includes(format)
                 ? format
@@ -82,13 +119,14 @@ export function newWebFetch(
                   : route.formats.includes("markdown")
                     ? "markdown"
                     : route.formats[0]!;
-          const routePages = await route.run(
-            route.key,
-            pendingURLs as URLList,
+          const routePages = await route.run({
+            settings: route.settings,
+            key: route.key,
+            urls: pendingURLs as URLList,
             signal,
-            ctx,
-            nativeFormat,
-          );
+            format: nativeFormat,
+            globals,
+          });
           signal.throwIfAborted();
           const convertedPages = await mapConcurrent(
             routePages,
@@ -103,7 +141,7 @@ export function newWebFetch(
                   ...page,
                   provider: route.id,
                   ...(page.format === format &&
-                  (page.format !== "html" || cleanup === "none")
+                  (page.format !== "html" || globals.cleanup === "none")
                     ? {}
                     : await (
                         await import("./cleanup")
@@ -112,7 +150,7 @@ export function newWebFetch(
                         page.format,
                         page.finalURL ?? page.url,
                         format,
-                        cleanup,
+                        globals.cleanup,
                       )),
                 };
               } catch (error) {
@@ -123,7 +161,7 @@ export function newWebFetch(
                 };
               }
             },
-            requestConcurrency(ctx),
+            requestConcurrency(globals),
             signal,
           );
           const routePagesByURL = new Map(

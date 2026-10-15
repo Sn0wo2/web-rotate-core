@@ -1,25 +1,24 @@
 import { LinkupClient } from "linkup-sdk";
-import { providerOptions } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { requireKey, sdkRequest } from "../utils";
 import { searchCount, searchResponse } from "./utils";
 
-export const linkup: SearchProvider = {
+export const linkup = {
   id: "linkup",
   weight: 68,
-  run: async (key, queries, signal, ctx) => {
+  run: async ({ settings, key, queries, signal, globals }) => {
     const client = new LinkupClient({
       apiKey: requireKey("linkup", key),
     });
     const payload = await sdkRequest(signal, () =>
       client.search({
         depth: "standard",
-        ...providerOptions(ctx, "linkup", "search"),
+        ...settings,
         outputType: "searchResults",
         query: queries[0],
-        maxResults: searchCount(ctx),
+        maxResults: searchCount(globals),
       }),
     );
     return searchResponse(payload);
   },
-};
+} satisfies SearchProvider;

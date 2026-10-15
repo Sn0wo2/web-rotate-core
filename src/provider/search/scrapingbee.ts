@@ -1,19 +1,18 @@
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { ScrapingBeeClient } from "scrapingbee";
-import { providerOptions } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { requireKey, sdkRequest } from "../utils";
 import { searchResponse } from "./utils";
 
-export const scrapingbee: SearchProvider = {
+export const scrapingbee = {
   id: "scrapingbee",
   weight: 48,
-  run: async (key, queries, signal, ctx) => {
+  run: async ({ settings, key, queries, signal }) => {
     const client = new ScrapingBeeClient(requireKey("scrapingbee", key));
     const response = await sdkRequest(signal, () =>
       client.googleSearch({
         search: queries[0],
-        params: { ...providerOptions(ctx, "scrapingbee", "search") },
+        params: { ...settings },
       }),
     );
     const payload = response.data as unknown;
@@ -24,4 +23,4 @@ export const scrapingbee: SearchProvider = {
         : payload,
     );
   },
-};
+} satisfies SearchProvider;

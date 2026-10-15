@@ -12,12 +12,12 @@ import { fetchManualRedirects } from "./utils";
 import type { FetchPage } from "./types";
 import type { FetchProvider } from "./types";
 
-export const native: FetchProvider = {
+export const native = {
   id: "native",
   weight: 70,
   keyless: true,
   formats: ["text", "html"],
-  run: async (_key, urls, signal, ctx) =>
+  run: async ({ urls, signal, globals }) =>
     mapConcurrent(
       urls,
       async (url): Promise<FetchPage> => {
@@ -96,7 +96,7 @@ export const native: FetchProvider = {
           };
         }
       },
-      requestConcurrency(ctx),
+      requestConcurrency(globals),
       signal,
     ),
-};
+} satisfies FetchProvider;

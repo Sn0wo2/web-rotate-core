@@ -1,27 +1,30 @@
 import OpenAI from "openai";
 import type { ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
-import { providerOptions, stringValue } from "../../shared/config";
+import { z } from "zod";
+import { stringValue } from "../../shared/config";
 import type { SearchProvider, SearchResponse, SearchResult } from "./types";
 import { requireKey } from "../utils";
 import { searchCount, searchResponse } from "./utils";
 
-type OpenAISearchOptions = {
-  model?: string;
-  instructions?: string;
-  max_output_tokens?: number;
-  reasoning?: Record<string, unknown>;
-  search_context_size?: "low" | "medium" | "high";
-  filters?: Record<string, unknown>;
-  user_location?: Record<string, unknown>;
-  external_web_access?: boolean;
-  return_token_budget?: number;
-};
+const settingsSchema = z.looseObject({
+  model: z.string().optional(),
+  instructions: z.string().optional(),
+  max_output_tokens: z.number().optional(),
+  reasoning: z.record(z.string(), z.unknown()).optional(),
+  search_context_size: z.enum(["low", "medium", "high"]).optional(),
+  filters: z.record(z.string(), z.unknown()).optional(),
+  user_location: z.record(z.string(), z.unknown()).optional(),
+  external_web_access: z.boolean().optional(),
+  return_token_budget: z.number().optional(),
+});
+type OpenAISearchSettings = z.output<typeof settingsSchema>;
 
-export const openai: SearchProvider = {
+export const openai = {
   id: "openai",
   weight: 66,
-  run: async (key, queries, signal, ctx) => {
+  options: settingsSchema,
+  run: async ({ settings, key, queries, signal, globals }) => {
     const {
       model,
       instructions,
@@ -33,7 +36,7 @@ export const openai: SearchProvider = {
       external_web_access,
       return_token_budget,
       ...rest
-    } = providerOptions<OpenAISearchOptions>(ctx, "openai", "search");
+    } = settings;
     const selectedModel = model?.trim() || "gpt-5-mini";
     const client = new OpenAI({ apiKey: requireKey("openai", key) });
     const payload = await client.responses.create(
@@ -41,7 +44,7 @@ export const openai: SearchProvider = {
         model: selectedModel,
         instructions:
           instructions?.trim() ||
-          `Search the web. Return at most ${searchCount(ctx)} concise factual snippets, one per line with an inline citation. Do not write a long-form answer.`,
+          `Search the web. Return at most ${searchCount(globals)} concise factual snippets, one per line with an inline citation. Do not write a long-form answer.`,
         max_output_tokens: max_output_tokens ?? 2048,
         ...(reasoning
           ? { reasoning }
@@ -122,4 +125,4 @@ export const openai: SearchProvider = {
       ...(citations.length ? { citations } : {}),
     };
   },
-};
+} satisfies SearchProvider<OpenAISearchSettings>;

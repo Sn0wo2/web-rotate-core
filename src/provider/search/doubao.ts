@@ -1,20 +1,20 @@
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
-import { providerOptions, stringValue } from "../../shared/config";
+import { stringValue } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { bearer } from "../utils";
 import { restSearch, searchCount } from "./utils";
 
-export const doubao: SearchProvider = {
+export const doubao = {
   id: "doubao",
   weight: 54,
-  run: restSearch(
+  run: restSearch<Record<string, unknown>>(
     "https://open.feedcoopapi.com/search_api/web_search",
-    (queries, ctx) => ({
+    ({ settings, queries, globals }) => ({
       SearchType: "web",
       NeedSummary: true,
-      ...providerOptions(ctx, "doubao", "search"),
+      ...settings,
       Query: queries[0],
-      Count: searchCount(ctx),
+      Count: searchCount(globals),
     }),
     bearer,
     (payload) => {
@@ -27,4 +27,4 @@ export const doubao: SearchProvider = {
       }));
     },
   ),
-};
+} satisfies SearchProvider;

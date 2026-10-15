@@ -1,19 +1,18 @@
 import { tavily as tavilyApi } from "@tavily/core";
-import { providerOptions, stringValue } from "../../shared/config";
+import { stringValue } from "../../shared/config";
 import type { FetchProvider } from "./types";
 import { mcpJSON, MCP_FETCH_TIMEOUT_MS } from "../mcp";
 import { sdkRequest } from "../utils";
 import { fetchBatches, fetchPages } from "./utils";
 
-export const tavily: FetchProvider = {
+export const tavily = {
   id: "tavily",
   weight: 68,
   keyless: true,
   formats: ["text", "markdown"],
-  run: async (key, urls, signal, ctx, format) => {
-    const options = providerOptions(ctx, "tavily", "fetch");
-    if (key && !Object.keys(options).length) {
-      return fetchBatches(urls, 20, ctx, signal, async (batch) => {
+  run: async ({ settings, key, urls, signal, format, globals }) => {
+    if (key && !Object.keys(settings).length) {
+      return fetchBatches(urls, 20, globals, signal, async (batch) => {
         const payload = await mcpJSON(
           `https://mcp.tavily.com/mcp/?tavilyApiKey=${key}`,
           {},
@@ -30,12 +29,12 @@ export const tavily: FetchProvider = {
         );
       });
     }
-    return fetchBatches(urls, 20, ctx, signal, async (batch) => {
+    return fetchBatches(urls, 20, globals, signal, async (batch) => {
       const response = await sdkRequest(signal, () =>
         tavilyApi(key ? { apiKey: key } : {}).extract(batch, {
           extractDepth: "advanced",
           format: format as "markdown" | "text",
-          ...options,
+          ...settings,
         }),
       );
       return fetchPages(
@@ -49,4 +48,4 @@ export const tavily: FetchProvider = {
       );
     });
   },
-};
+} satisfies FetchProvider;

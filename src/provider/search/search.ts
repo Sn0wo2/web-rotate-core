@@ -1,26 +1,85 @@
 import { chunk, uniq } from "es-toolkit/array";
 import { HTTPError, timedSignal } from "../../shared/http";
-import { RotateConfigError, option, stringList } from "../../shared/config";
+import { RotateConfigError, globalsSchema } from "../../shared/config";
+import type { Globals } from "../../shared/config";
 import {
   errorMessage,
   mapConcurrent,
   requestConcurrency,
 } from "../../shared/utils";
-import type { RotateContext, URLList } from "../../shared/types";
-import { orderedProviderRoutes, resolveMaxAttempts } from "../rotation";
+import type { URLList } from "../../shared/types";
+import {
+  providerRoutes,
+  resolveMaxAttempts,
+  resolveProviderEntries,
+  selectRoutes,
+} from "../rotation";
+import type { ProviderEntry } from "../types";
 import { SEARCH_PROVIDERS } from "./index";
 import { searchCount } from "./utils";
-import type { SearchOutcome, SearchProvider, SearchResult } from "./types";
+import type {
+  SearchOutcome,
+  SearchProvider,
+  SearchProviderConfigBase,
+  SearchResult,
+} from "./types";
 
-export function newWebSearch(
-  ctx: RotateContext,
-  providers: readonly SearchProvider[] = SEARCH_PROVIDERS,
+export type SearchProviderConfig<P extends readonly SearchProvider[] = []> =
+  SearchProviderConfigBase<typeof SEARCH_PROVIDERS> &
+    SearchProviderConfigBase<NoInfer<P>> & {
+      prefer?: "keyed" | "keyless" | undefined;
+      concurrency?: number | undefined;
+      maxAttempts?: number | undefined;
+      searchResults?: number | undefined;
+    };
+
+export type DefaultSearchProviderConfig = SearchProviderConfig;
+
+export const DEFAULT_SEARCH_PROVIDER_CONFIG: DefaultSearchProviderConfig = {
+  perplexity: {},
+  octen: {},
+  tavily: {},
+  parallel: {},
+  you: {},
+  nimble: {},
+  exa: {},
+  brave: {},
+  hyperbrowser: {},
+  firecrawl: {},
+  tinyfish: {},
+  keenable: {},
+  serper: {},
+  bocha: {},
+  jina: {},
+  scrapingbee: {},
+  diffbot: {},
+  brightdata: {},
+  linkup: {},
+  doubao: {},
+  openai: {},
+  native: {},
+};
+
+export function createWebSearcher<P extends readonly SearchProvider[] = []>(
+  config: SearchProviderConfig<P> = {},
+  implementations?: P,
 ): {
   search(input: {
     queries: URLList;
     signal: AbortSignal;
   }): Promise<SearchOutcome>;
 } {
+  const globals: Globals = globalsSchema.parse(config);
+  const registry = new Map<string, SearchProvider>();
+  for (const provider of [...SEARCH_PROVIDERS, ...(implementations ?? [])])
+    registry.set(provider.id, provider);
+  const enabled = [...registry.values()];
+  const entries = resolveProviderEntries(
+    enabled,
+    config.providers as Record<string, ProviderEntry> | undefined,
+    "websearch",
+  );
+  const pool = providerRoutes(enabled, entries, globals);
   const failures = new Map<string, number>();
   return {
     search: async ({ queries, signal }) => {
@@ -28,30 +87,16 @@ export function newWebSearch(
       if (!queries.length || queries.some((query) => !query.trim()))
         throw new RotateConfigError("search queries must not be empty");
       const uniqueQueries = uniq(queries.map((query) => query.trim()));
-      const mode = option(ctx, "mode");
-      const maxResults = searchCount(ctx);
-      const pins = stringList(ctx.getOption("provider"));
-      const modes = pins.length ? pins : [mode];
-      if (
-        modes.some(
-          (name) =>
-            name !== "auto" &&
-            !providers.some((provider) => provider.id === name),
-        )
-      )
-        throw new RotateConfigError(
-          `websearch-rotate: unsupported provider or mode ${modes.join(", ")}`,
-          "unsupported-mode",
-        );
-      const routes = orderedProviderRoutes(providers, ctx, modes, failures);
-      const maxAttempts = resolveMaxAttempts(ctx, routes.length);
+      const maxResults = searchCount(globals);
+      const candidates = selectRoutes(pool, failures);
+      const maxAttempts = resolveMaxAttempts(globals, candidates.length);
       const pending = new Set(uniqueQueries);
       const blocked = new Map<string, Error>();
       const errors = new Map<string, string>();
       const results = new Map<string, SearchResult>();
       const responses: SearchOutcome["responses"] = [];
       let attempts = 0;
-      for (const route of routes) {
+      for (const route of candidates) {
         if (!pending.size || attempts >= maxAttempts) break;
         if (blocked.has(route.id)) continue;
         attempts++;
@@ -69,15 +114,13 @@ export function newWebSearch(
               const budget =
                 Math.max(1, Math.ceil(maxResults / uniqueQueries.length)) *
                 group.length;
-              const response = await route.run(
-                route.key,
-                group as URLList,
-                timedSignal(signal),
-                {
-                  getOption: (name) =>
-                    name === "searchResults" ? budget : ctx.getOption(name),
-                },
-              );
+              const response = await route.run({
+                settings: route.settings,
+                key: route.key,
+                queries: group as URLList,
+                signal: timedSignal(signal),
+                globals: { ...globals, searchResults: budget },
+              });
               return { group, response };
             } catch (error) {
               if (signal.aborted || error instanceof RotateConfigError)
@@ -90,7 +133,7 @@ export function newWebSearch(
               };
             }
           },
-          requestConcurrency(ctx),
+          requestConcurrency(globals),
           signal,
         );
         signal.throwIfAborted();

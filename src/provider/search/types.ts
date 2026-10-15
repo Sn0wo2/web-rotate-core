@@ -1,5 +1,6 @@
-import type { RotateContext, URLList } from "../../shared/types";
-import type { Provider } from "../types";
+import type { Globals } from "../../shared/config";
+import type { URLList } from "../../shared/types";
+import type { Provider, ProviderEntry, SettingsOf } from "../types";
 
 export type SearchResult = {
   url: string;
@@ -29,12 +30,20 @@ export type SearchOutcome = {
   errors?: { query: string; error: string }[];
 };
 
-export type SearchProvider = Provider & {
-  batchSize?: number;
-  run: (
-    key: string | undefined,
-    queries: URLList,
-    signal: AbortSignal,
-    ctx: RotateContext,
-  ) => Promise<SearchResponse>;
+export type SearchProvider<Settings = Record<string, unknown>> =
+  Provider<Settings> & {
+    batchSize?: number | undefined;
+    run(input: {
+      settings: Settings;
+      key: string | undefined;
+      queries: URLList;
+      signal: AbortSignal;
+      globals: Globals;
+    }): Promise<SearchResponse>;
+  };
+
+export type SearchProviderConfigBase<P extends readonly SearchProvider[]> = {
+  [K in P[number]["id"]]+?: ProviderEntry<
+    SettingsOf<Extract<P[number], { id: K }>>
+  >;
 };

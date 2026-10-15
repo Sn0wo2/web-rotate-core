@@ -1,14 +1,13 @@
 import { clamp } from "es-toolkit/math";
 import pMap from "p-map";
-import { option } from "./config";
-import type { RotateContext } from "./types";
+import type { Globals } from "./config";
 
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function requestConcurrency(ctx: RotateContext) {
-  return clamp(option(ctx, "concurrency"), 1, 16);
+export function requestConcurrency(globals: Globals) {
+  return clamp(globals.concurrency, 1, 16);
 }
 
 export function mapConcurrent<T, R>(

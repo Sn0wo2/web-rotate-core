@@ -20,16 +20,16 @@ const IMAGE_MIMES = new Set([
   "image/heif",
 ]);
 
-/** 单个疑似图片的 URL 走本地直抓 base64；不适用或失败时返回 undefined，交给供应商轮换 */
 export async function fetchImage(
   urls: URLList,
-  mode: string,
   signal: AbortSignal,
+  nativeEnabled: boolean,
+  nativeOnly: boolean,
 ): Promise<FetchOutcome | undefined> {
   if (
+    !nativeEnabled ||
     urls.length !== 1 ||
-    (mode !== "native" &&
-      !(mode === "auto" && IMAGE_EXT.test(new URL(urls[0]).pathname)))
+    (!nativeOnly && !IMAGE_EXT.test(new URL(urls[0]).pathname))
   )
     return undefined;
   try {

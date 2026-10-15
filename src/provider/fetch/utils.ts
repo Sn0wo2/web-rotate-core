@@ -1,13 +1,13 @@
 import { chunk, keyBy } from "es-toolkit/array";
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { HTTPError, timedSignal } from "../../shared/http";
+import type { Globals } from "../../shared/config";
 import {
   errorMessage,
   mapConcurrent,
   requestConcurrency,
 } from "../../shared/utils";
 import { stringValue } from "../../shared/config";
-import type { RotateContext } from "../../shared/types";
 import type { FetchFormat, FetchPage, FetchProvider } from "./types";
 import { firstList, responseMetadata } from "../utils";
 
@@ -98,11 +98,10 @@ export function fetchPages(
   });
 }
 
-/** 按 size 分批并发抓取，单批失败转为该批 URL 的 error 页 */
 export async function fetchBatches(
   urls: readonly string[],
   size: number,
-  ctx: RotateContext,
+  globals: Globals,
   signal: AbortSignal,
   run: (batch: string[]) => Promise<FetchPage[]>,
 ): Promise<FetchPage[]> {
@@ -127,7 +126,7 @@ export async function fetchBatches(
         }));
       }
     },
-    requestConcurrency(ctx),
+    requestConcurrency(globals),
     signal,
   );
   return batches.flat();
@@ -179,16 +178,17 @@ export async function fetchManualRedirects(
   }
 }
 
-export function fetchOne(
-  run: (
-    key: string | undefined,
-    url: string,
-    signal: AbortSignal,
-    ctx: RotateContext,
-    format: FetchFormat,
-  ) => Promise<Omit<FetchPage, "url">>,
-): FetchProvider["run"] {
-  return async (key, urls, signal, ctx, format) => {
+export function fetchOne<S>(
+  run: (input: {
+    settings: S;
+    key: string | undefined;
+    url: string;
+    signal: AbortSignal;
+    format: FetchFormat;
+    globals: Globals;
+  }) => Promise<Omit<FetchPage, "url">>,
+): FetchProvider<S>["run"] {
+  return async ({ settings, key, urls, signal, format, globals }) => {
     const results = new Array<FetchPage | undefined>(urls.length);
     const stop = new AbortController();
     try {
@@ -200,7 +200,14 @@ export function fetchOne(
           try {
             results[index] = {
               url,
-              ...(await run(key, url, requestSignal, ctx, format)),
+              ...(await run({
+                settings,
+                key,
+                url,
+                signal: requestSignal,
+                format,
+                globals,
+              })),
             };
           } catch (error) {
             if (error instanceof HTTPError) {
@@ -226,7 +233,7 @@ export function fetchOne(
             results[index] = { url, error: errorMessage(error) };
           }
         },
-        requestConcurrency(ctx),
+        requestConcurrency(globals),
         signal,
       );
     } catch (error) {

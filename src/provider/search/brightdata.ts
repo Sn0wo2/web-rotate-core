@@ -1,21 +1,20 @@
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
+import { z } from "zod";
 import { apiJSON } from "../../shared/http";
-import { providerOptions, stringValue } from "../../shared/config";
+import { stringValue } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { requireKey } from "../utils";
 import { searchResponse } from "./utils";
 
-type BrightdataOptions = { zone?: string };
+const settingsSchema = z.looseObject({ zone: z.string().optional() });
+type BrightdataSearchSettings = z.output<typeof settingsSchema>;
 
-export const brightdata: SearchProvider = {
+export const brightdata = {
   id: "brightdata",
   weight: 50,
-  run: async (key, queries, signal, ctx) => {
-    const { zone, ...options } = providerOptions<BrightdataOptions>(
-      ctx,
-      "brightdata",
-      "search",
-    );
+  options: settingsSchema,
+  run: async ({ settings, key, queries, signal }) => {
+    const { zone, ...options } = settings;
     if (!zone?.trim())
       throw new Error("brightdata SERP zone is not configured");
     const searchURL = new URL("https://www.google.com/search");
@@ -54,4 +53,4 @@ export const brightdata: SearchProvider = {
           })),
     );
   },
-};
+} satisfies SearchProvider<BrightdataSearchSettings>;

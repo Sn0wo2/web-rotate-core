@@ -5,18 +5,16 @@ import {
   FETCH_PROVIDERS,
   RotateConfigError,
 } from "../src/index";
-import { orderedProviderRoutes } from "../src/provider/rotation";
-import type { FetchProvider } from "../src/provider/fetch/types";
+import type {
+  FetchProvider,
+  FetchProviderConfig,
+  ProviderEntry,
+} from "../src/index";
 import { errorMessage, mapConcurrent } from "../src/shared/utils";
-import type { RotateContext } from "../src/shared/types";
 
 const DEFAULT_MODEL = "jev-1.13";
 const FETCH_CONCURRENCY = 2;
 const JUDGE_CONCURRENCY = 2;
-
-const nativeProvider = FETCH_PROVIDERS.find(
-  (provider) => provider.id === "native",
-);
 
 const JUDGE_INSTRUCTIONS = `Evaluate the unnamed candidate's web page text extraction for the given URL. Use the provided native local extraction of the same page as a completeness reference, not as a candidate to score. Judge the quality of the extracted main content, considering coverage, structure, and cleanliness
 
@@ -60,8 +58,8 @@ notes:
   provider keys come from env, one variable per provider:
   <PROVIDER>_API_KEY (no aliases); a value may hold several keys separated
   by spaces, commas, or semicolons for rotation.
-  --env K=V sets library options verbatim (e.g. fetchConcurrency=1,
-  mode=auto, webfetchCleanup=defuddle, maxAttempts=3).
+  --env K=V sets config values (e.g. cleanup=defuddle, concurrency=1,
+  maxAttempts=3).
   judge env: TYPESAFE_API_KEY and TYPESAFE_BASE_URL (both required),
   TYPESAFE_MODEL`;
 
@@ -135,8 +133,8 @@ type EnvContext = {
   getOption(name: string): string | undefined;
 };
 
-function buildContext(parsed: Parsed): EnvContext {
-  const env = new Map(
+function envMap(parsed: Parsed): Map<string, string> {
+  return new Map(
     parsed.env.map((entry) => {
       const eq = entry.indexOf("=");
       return eq > 0
@@ -144,23 +142,53 @@ function buildContext(parsed: Parsed): EnvContext {
         : ([entry, ""] as [string, string]);
     }),
   );
+}
+
+function buildContext(parsed: Parsed): EnvContext {
+  const env = envMap(parsed);
   return {
-    getOption: (name) => {
-      if (name === "prefer") return "keyless";
-      const fromArgs = env.get(name);
-      if (fromArgs !== undefined) return fromArgs;
-      const provider = /^(\w+)Keys$/.exec(name)?.[1];
-      if (!provider) return undefined;
-      const variable = `${provider.toUpperCase()}_API_KEY`;
-      return process.env[variable];
-    },
+    getOption: (name) => env.get(name) ?? process.env[name.toUpperCase()],
   };
 }
 
+function providerKeys(
+  env: Map<string, string>,
+  id: string,
+): string[] | undefined {
+  const raw =
+    env.get(`${id}Keys`) ?? process.env[`${id.toUpperCase()}_API_KEY`];
+  return raw ? raw.split(/[\s,;]+/).filter(Boolean) : undefined;
+}
+
+function buildFetchConfig(
+  parsed: Parsed,
+  options?: { cleanup?: "none" | "defuddle"; only?: string },
+): FetchProviderConfig {
+  const env = envMap(parsed);
+  const config: FetchProviderConfig = { prefer: "keyless" };
+  const cleanup = options?.cleanup ?? env.get("cleanup");
+  if (cleanup === "none" || cleanup === "defuddle") config.cleanup = cleanup;
+  const concurrency = Number(env.get("concurrency"));
+  if (Number.isFinite(concurrency) && concurrency > 0)
+    config.concurrency = concurrency;
+  const maxAttempts = Number(env.get("maxAttempts"));
+  if (Number.isFinite(maxAttempts) && maxAttempts > 0)
+    config.maxAttempts = maxAttempts;
+  const slots: Record<string, ProviderEntry> = {};
+  for (const provider of FETCH_PROVIDERS) {
+    if (options?.only && provider.id !== options.only) continue;
+    const keys = providerKeys(env, provider.id);
+    slots[provider.id] = keys?.length ? { keys } : {};
+  }
+  config.providers = slots as NonNullable<FetchProviderConfig["providers"]>;
+  return config;
+}
+
 function selectProviders(
-  ctx: RotateContext,
+  parsed: Parsed,
   filter?: string[],
 ): { provider: FetchProvider; skip?: string }[] {
+  const env = envMap(parsed);
   if (filter?.length) {
     return filter.map((id) => {
       const provider = FETCH_PROVIDERS.find((entry) => entry.id === id);
@@ -176,13 +204,7 @@ function selectProviders(
   return FETCH_PROVIDERS.filter((provider) => provider.id !== "native").map(
     (provider) => {
       if (provider.keyless) return { provider };
-      const routes = orderedProviderRoutes(
-        [provider],
-        ctx,
-        [provider.id],
-        new Map(),
-      );
-      return routes.length
+      return providerKeys(env, provider.id)?.length
         ? { provider }
         : {
             provider,
@@ -202,18 +224,14 @@ type Row = {
 
 async function fetchProvider(
   urls: readonly string[],
-  ctx: RotateContext,
+  parsed: Parsed,
   provider: FetchProvider | undefined,
   signal: AbortSignal,
 ): Promise<Row[]> {
   const id = provider?.id ?? "native";
-  const rowCtx = provider
-    ? ctx
-    : {
-        ...ctx,
-        getOption: (name: string) =>
-          name === "webfetchCleanup" ? "defuddle" : ctx.getOption(name),
-      };
+  const config = provider
+    ? buildFetchConfig(parsed, { only: provider.id })
+    : buildFetchConfig(parsed, { only: "native", cleanup: "defuddle" });
   const failed = (url: string, error: string): Row => ({
     provider: id,
     url,
@@ -222,10 +240,7 @@ async function fetchProvider(
     error,
   });
   try {
-    const outcome = await createWebFetcher(
-      rowCtx,
-      provider ? [provider] : nativeProvider ? [nativeProvider] : [],
-    ).fetch({
+    const outcome = await createWebFetcher(config).fetch({
       urls: [...urls] as [string, ...string[]],
       format: "markdown",
       signal,
@@ -262,9 +277,6 @@ type Candidate = {
   content: string;
 };
 
-// jev-1.13 has a 32k-token window. tokenEstimate is a first-guess heuristic
-// only; a 400 max_tokens_exceeded halves the budget and retries, so exact
-// tokenizer ratios are not load-bearing.
 const TOKEN_BUDGET = 32_000;
 
 const tokenEstimate = (text: string) => {
@@ -273,8 +285,6 @@ const tokenEstimate = (text: string) => {
   return cjk + (text.length - cjk) * 0.3;
 };
 
-// judge payload normalization: link targets, bare URLs, and images are pure
-// token noise for quality judging; the candidates/*.md dumps stay raw.
 const judgeView = (text: string) =>
   text
     .replace(/!\[[^\]]*\]\((?:[^()]|\([^()]*\))*\)/g, "")
@@ -684,7 +694,7 @@ async function main() {
   const ctx = buildContext(parsed);
   const cfg = judgeConfig(ctx);
   const selection = selectProviders(
-    ctx,
+    parsed,
     parsed.providers.length ? parsed.providers : undefined,
   );
   const selected = selection.filter((row) => !row.skip);
@@ -713,7 +723,7 @@ async function main() {
         const started = Date.now();
         const providerRows = await fetchProvider(
           urls,
-          ctx,
+          parsed,
           provider,
           fetchSignal,
         );

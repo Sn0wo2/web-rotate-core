@@ -1,4 +1,3 @@
-import type { SearchProvider } from "./types";
 import { perplexity } from "./perplexity";
 import { octen } from "./octen";
 import { tavily } from "./tavily";
@@ -22,7 +21,7 @@ import { doubao } from "./doubao";
 import { openai } from "./openai";
 import { native } from "./native";
 
-export const SEARCH_PROVIDERS: readonly SearchProvider[] = [
+export const SEARCH_PROVIDERS = [
   perplexity,
   octen,
   tavily,
@@ -45,4 +44,4 @@ export const SEARCH_PROVIDERS: readonly SearchProvider[] = [
   doubao,
   openai,
   native,
-];
+] as const;

@@ -1,24 +1,24 @@
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
+import { z } from "zod";
 import { apiJSON } from "../../shared/http";
-import { providerOptions } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { urlParams } from "../utils";
 import { searchCount, searchResponse } from "./utils";
 
-type JinaOptions = { headers?: Record<string, string> };
+const settingsSchema = z.looseObject({
+  headers: z.record(z.string(), z.string()).optional(),
+});
+type JinaSearchSettings = z.output<typeof settingsSchema>;
 
-export const jina: SearchProvider = {
+export const jina = {
   id: "jina",
   weight: 58,
-  run: async (key, queries, signal, ctx) => {
+  options: settingsSchema,
+  run: async ({ settings, key, queries, signal, globals }) => {
     if (!key) throw new Error("jina API key is not configured for search");
-    const { headers, ...options } = providerOptions<JinaOptions>(
-      ctx,
-      "jina",
-      "search",
-    );
+    const { headers, ...options } = settings;
     const endpoint = urlParams(new URL("https://s.jina.ai"), {
-      num: searchCount(ctx, 20),
+      num: searchCount(globals, 20),
       ...options,
       q: queries[0],
     });
@@ -38,4 +38,4 @@ export const jina: SearchProvider = {
         : undefined,
     );
   },
-};
+} satisfies SearchProvider<JinaSearchSettings>;

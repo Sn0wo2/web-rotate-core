@@ -1,5 +1,6 @@
-import type { RotateContext, URLList } from "../../shared/types";
-import type { Provider } from "../types";
+import type { Globals } from "../../shared/config";
+import type { URLList } from "../../shared/types";
+import type { Provider, ProviderEntry, SettingsOf } from "../types";
 
 export type FetchFormat = "text" | "markdown" | "html";
 
@@ -18,13 +19,21 @@ export type FetchOutcome =
   | { type: "image"; url: string; mime: string; base64: string }
   | { type: "pages"; pages: FetchPage[] };
 
-export type FetchProvider = Provider & {
-  formats: readonly FetchFormat[];
-  run: (
-    key: string | undefined,
-    urls: URLList,
-    signal: AbortSignal,
-    ctx: RotateContext,
-    format: FetchFormat,
-  ) => Promise<FetchPage[]>;
+export type FetchProvider<Settings = Record<string, unknown>> =
+  Provider<Settings> & {
+    formats: readonly FetchFormat[];
+    run(input: {
+      settings: Settings;
+      key: string | undefined;
+      urls: URLList;
+      signal: AbortSignal;
+      format: FetchFormat;
+      globals: Globals;
+    }): Promise<FetchPage[]>;
+  };
+
+export type FetchProviderConfigBase<P extends readonly FetchProvider[]> = {
+  [K in P[number]["id"]]+?: ProviderEntry<
+    SettingsOf<Extract<P[number], { id: K }>>
+  >;
 };

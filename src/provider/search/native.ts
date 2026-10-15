@@ -113,12 +113,12 @@ const SERP_ENGINES: {
   },
 ];
 
-export const native: SearchProvider = {
+export const native = {
   id: "native",
   weight: 70,
   keyless: true,
-  run: async (_key, queries, signal, ctx) => {
-    const count = searchCount(ctx);
+  run: async ({ queries, signal, globals }) => {
+    const count = searchCount(globals);
     const groups = await mapConcurrent(
       queries,
       async (query): Promise<SearchResult[]> => {
@@ -132,9 +132,9 @@ export const native: SearchProvider = {
         }
         throw new Error("all native SERP engines failed");
       },
-      requestConcurrency(ctx),
+      requestConcurrency(globals),
       signal,
     );
     return { results: groups.flat() };
   },
-};
+} satisfies SearchProvider;

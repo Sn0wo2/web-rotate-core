@@ -1,19 +1,19 @@
 import { apiJSON } from "../../shared/http";
-import { providerOptions, stringValue } from "../../shared/config";
+import { stringValue } from "../../shared/config";
 import type { FetchProvider } from "./types";
 import { requireKey } from "../utils";
 import { fetchBatches, fetchPages } from "./utils";
 
-export const tinyfish: FetchProvider = {
+export const tinyfish = {
   id: "tinyfish",
   weight: 74,
   formats: ["html", "markdown"],
-  run: async (key, urls, signal, ctx, format) => {
-    return fetchBatches(urls, 10, ctx, signal, async (batch) => {
+  run: async ({ settings, key, urls, signal, format, globals }) => {
+    return fetchBatches(urls, 10, globals, signal, async (batch) => {
       const payload = await apiJSON("https://api.fetch.tinyfish.ai", signal, {
         label: "tinyfish",
         body: {
-          ...providerOptions(ctx, "tinyfish", "fetch"),
+          ...settings,
           urls: batch,
           format,
         },
@@ -27,4 +27,4 @@ export const tinyfish: FetchProvider = {
       );
     });
   },
-};
+} satisfies FetchProvider;

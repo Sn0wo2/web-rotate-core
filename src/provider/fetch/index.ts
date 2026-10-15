@@ -1,4 +1,3 @@
-import type { FetchProvider } from "./types";
 import { tavily } from "./tavily";
 import { parallel } from "./parallel";
 import { you } from "./you";
@@ -16,8 +15,7 @@ import { apify } from "./apify";
 import { linkup } from "./linkup";
 import { native } from "./native";
 
-/** 顺序与历史 WEBFETCH_PROVIDERS 保持一致（weight 相同时按此稳定排序） */
-export const FETCH_PROVIDERS: readonly FetchProvider[] = [
+export const FETCH_PROVIDERS = [
   tavily,
   parallel,
   you,
@@ -34,4 +32,4 @@ export const FETCH_PROVIDERS: readonly FetchProvider[] = [
   apify,
   linkup,
   native,
-];
+] as const;
