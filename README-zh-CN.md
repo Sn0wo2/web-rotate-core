@@ -50,16 +50,16 @@ WebFetch 方面我们使用了自己的 [WebFetch Benchmark](./benchmark/README.
 
 - [Perplexity](https://www.perplexity.ai)
 - [Octen](https://octen.ai)
-- [Tavily](https://www.tavily.com)
-- [Parallel](https://parallel.ai)
+- [Tavily](https://www.tavily.com) `Keyless`
+- [Parallel](https://parallel.ai) `Keyless`
 - [You.com](https://you.com)
 - [Nimble](https://nimbleway.com)
-- [Exa](https://exa.ai)
+- [Exa](https://exa.ai) `Keyless`
 - [Brave Search](https://brave.com/search/api)
 - [HyperBrowser](https://hyperbrowser.ai)
-- [Firecrawl](https://www.firecrawl.dev)
+- [Firecrawl](https://www.firecrawl.dev) `Keyless`
 - [TinyFish](https://www.tinyfish.ai)
-- [Keenable](https://keenable.ai)
+- [Keenable](https://keenable.ai) `Keyless`
 - [Serper](https://serper.dev)
 - [Bocha](https://bochaai.com)
 - [Jina](https://jina.ai)
@@ -69,18 +69,18 @@ WebFetch 方面我们使用了自己的 [WebFetch Benchmark](./benchmark/README.
 - [Linkup](https://www.linkup.so)
 - [Doubao](https://www.volcengine.com)
 - [OpenAI](https://openai.com)
-- Native 内置实现
+- Native 内置实现 `Keyless`
 
 ### WebFetch
 
-- [Tavily](https://www.tavily.com)
-- [Parallel](https://parallel.ai)
+- [Tavily](https://www.tavily.com) `Keyless`
+- [Parallel](https://parallel.ai) `Keyless`
 - [You.com](https://you.com)
 - [Exa](https://exa.ai)
 - [HyperBrowser](https://hyperbrowser.ai)
-- [Firecrawl](https://www.firecrawl.dev)
+- [Firecrawl](https://www.firecrawl.dev) `Keyless`
 - [TinyFish](https://www.tinyfish.ai)
-- [Jina](https://jina.ai)
+- [Jina](https://jina.ai) `Keyless`
 - [ScrapingAnt](https://scrapingant.com)
 - [ScrapingBee](https://www.scrapingbee.com)
 - [ScrapFly](https://scrapfly.io)
@@ -88,7 +88,7 @@ WebFetch 方面我们使用了自己的 [WebFetch Benchmark](./benchmark/README.
 - [Bright Data](https://brightdata.com)
 - [Apify](https://apify.com)
 - [Linkup](https://www.linkup.so)
-- Native 内置实现
+- Native 内置实现 `Keyless`
 
 如果现有的这些提供商都没有满足你, 你也可以给 `core` 轻松扩展你自己想要的提供商
 
