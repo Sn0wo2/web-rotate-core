@@ -18,6 +18,7 @@ export const you = {
           body: {
             crawl_timeout: 30,
             ...settings,
+            max_age: globals.cacheWindowSeconds,
             urls: batch,
             formats: [format],
           },

@@ -2,10 +2,6 @@
 
 > One Gateway for All WebSearch/WebFetch Providers!
 
-## 语言
-
-- [README.md](./README.md)
-
 ## 来源小故事
 
 过去, 我们通过搜索引擎寻找信息; 如今, Agent 已经能够自主搜索、浏览网页, 获取外部世界的知识, 但 Agent 不再使用传统搜索引擎
@@ -20,7 +16,7 @@
 
 这就是 **[`web-rotate-core`](https://github.com/Sn0wo2/web-rotate-core)** 想要解决的问题（以下简称 `core`）
 
-**`core` 是一个库**，你可以依赖它来给你的任意 Node 生态接入
+**`core`** **是一个库**，你可以依赖它来给你的任意 Node 生态接入
 
 ## 生态
 
@@ -31,8 +27,6 @@
 ## 权重和Benchmark
 
 在 WebSearch 方面，默认路由权重参考了 [Artificial Analysis 的 Search API Index](https://artificialanalysis.ai/agents/search-api)
-
----
 
 WebFetch 方面我们使用了自己的 [WebFetch Benchmark](./benchmark/README.md)
 
@@ -68,6 +62,7 @@ WebFetch 方面我们使用了自己的 [WebFetch Benchmark](./benchmark/README.
 - [Bright Data](https://brightdata.com)
 - [Linkup](https://www.linkup.so)
 - [Doubao](https://www.volcengine.com)
+- [DeepSeek](https://www.deepseek.com)
 - [OpenAI](https://openai.com)
 - Native 内置实现 `Keyless`
 
@@ -88,11 +83,11 @@ WebFetch 方面我们使用了自己的 [WebFetch Benchmark](./benchmark/README.
 - [Bright Data](https://brightdata.com)
 - [Apify](https://apify.com)
 - [Linkup](https://www.linkup.so)
+- [DeepSeek](https://www.deepseek.com)
 - Native 内置实现 `Keyless`
 
 如果现有的这些提供商都没有满足你, 你也可以给 `core` 轻松扩展你自己想要的提供商
 
 # 文档
 
-这个中文`README-zh-CN.md`是纯手写的啦, 放心看, 不过 en-US `README.md`是用AI翻译的
-所以我基本没有写代码文档, 你可以在 https://deepwiki.com/Sn0wo2/web-rotate-core 查看代码文档
+代码文档可在 <https://deepwiki.com/Sn0wo2/web-rotate-core> 查看

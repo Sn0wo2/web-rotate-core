@@ -27,6 +27,9 @@ export const jina = {
         Authorization: `Bearer ${key}`,
         "X-Respond-With": "no-content",
         ...headers,
+        ...(globals.cacheWindowSeconds === 0
+          ? { "X-No-Cache": "true" }
+          : { "X-Cache-Tolerance": String(globals.cacheWindowSeconds) }),
       },
     });
     return searchResponse(

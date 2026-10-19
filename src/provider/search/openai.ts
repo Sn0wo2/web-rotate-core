@@ -1,8 +1,7 @@
-import OpenAI from "openai";
-import type { ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { z } from "zod";
 import { stringValue } from "../../shared/config";
+import { apiJSON } from "../../shared/http";
 import type { SearchProvider, SearchResponse, SearchResult } from "./types";
 import { requireKey } from "../utils";
 import { searchCount, searchResponse } from "./utils";
@@ -38,37 +37,44 @@ export const openai = {
       ...rest
     } = settings;
     const selectedModel = model?.trim() || "gpt-5-mini";
-    const client = new OpenAI({ apiKey: requireKey("openai", key) });
-    const payload = await client.responses.create(
+    const payload = await apiJSON(
+      "https://api.openai.com/v1/responses",
+      signal,
       {
-        model: selectedModel,
-        instructions:
-          instructions?.trim() ||
-          `Search the web. Return at most ${searchCount(globals)} concise factual snippets, one per line with an inline citation. Do not write a long-form answer.`,
-        max_output_tokens: max_output_tokens ?? 2048,
-        ...(reasoning
-          ? { reasoning }
-          : selectedModel === "gpt-5-mini"
-            ? { reasoning: { effort: "low" } }
-            : {}),
-        max_tool_calls: 1,
-        store: false,
-        ...rest,
-        tool_choice: "required",
-        include: ["web_search_call.action.sources"],
-        tools: [
-          {
-            type: "web_search",
-            search_context_size: search_context_size ?? "medium",
-            ...(filters ? { filters } : {}),
-            ...(user_location ? { user_location } : {}),
-            ...(external_web_access != null ? { external_web_access } : {}),
-            ...(return_token_budget != null ? { return_token_budget } : {}),
-          },
-        ],
-        input: queries[0],
-      } as ResponseCreateParamsNonStreaming,
-      { signal },
+        key: requireKey("openai", key),
+        body: {
+          model: selectedModel,
+          instructions:
+            instructions?.trim() ||
+            `Search the web. Return at most ${searchCount(globals)} concise factual snippets, one per line with an inline citation. Do not write a long-form answer.`,
+          max_output_tokens: max_output_tokens ?? 2048,
+          ...(reasoning
+            ? { reasoning }
+            : selectedModel === "gpt-5-mini"
+              ? { reasoning: { effort: "low" } }
+              : {}),
+          max_tool_calls: 1,
+          store: false,
+          ...rest,
+          tool_choice: "required",
+          include: ["web_search_call.action.sources"],
+          tools: [
+            {
+              type: "web_search",
+              search_context_size: search_context_size ?? "medium",
+              ...(filters ? { filters } : {}),
+              ...(user_location ? { user_location } : {}),
+              ...(globals.cacheWindowSeconds === 0
+                ? { external_web_access: true }
+                : external_web_access != null
+                  ? { external_web_access }
+                  : {}),
+              ...(return_token_budget != null ? { return_token_budget } : {}),
+            },
+          ],
+          input: queries[0],
+        },
+      },
     );
     const output: unknown[] =
       isRecord(payload) && Array.isArray(payload.output) ? payload.output : [];

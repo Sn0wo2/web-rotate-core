@@ -1,10 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import {
-  createWebFetcher,
-  FETCH_PROVIDERS,
-  RotateConfigError,
-} from "../src/index";
+import { fetchWeb, FETCH_PROVIDERS, RotateConfigError } from "../src/index";
 import type {
   FetchProvider,
   FetchProviderConfig,
@@ -203,7 +199,7 @@ function selectProviders(
   }
   return FETCH_PROVIDERS.filter((provider) => provider.id !== "native").map(
     (provider) => {
-      if (provider.keyless) return { provider };
+      if ("keyless" in provider && provider.keyless) return { provider };
       return providerKeys(env, provider.id)?.length
         ? { provider }
         : {
@@ -240,7 +236,8 @@ async function fetchProvider(
     error,
   });
   try {
-    const outcome = await createWebFetcher(config).fetch({
+    const outcome = await fetchWeb({
+      config,
       urls: [...urls] as [string, ...string[]],
       format: "markdown",
       signal,

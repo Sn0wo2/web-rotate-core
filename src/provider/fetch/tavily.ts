@@ -1,8 +1,8 @@
-import { tavily as tavilyApi } from "@tavily/core";
+import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { stringValue } from "../../shared/config";
+import { apiJSON, REQUEST_TIMEOUT_MS } from "../../shared/http";
 import type { FetchProvider } from "./types";
 import { mcpJSON, MCP_FETCH_TIMEOUT_MS } from "../mcp";
-import { sdkRequest } from "../utils";
 import { fetchBatches, fetchPages } from "./utils";
 
 export const tavily = {
@@ -30,18 +30,65 @@ export const tavily = {
       });
     }
     return fetchBatches(urls, 20, globals, signal, async (batch) => {
-      const response = await sdkRequest(signal, () =>
-        tavilyApi(key ? { apiKey: key } : {}).extract(batch, {
-          extractDepth: "advanced",
-          format: format as "markdown" | "text",
-          ...settings,
-        }),
+      const { timeout, sessionId, humanId, clientName, ...options } = settings;
+      const requestOptions = Object.fromEntries(
+        Object.entries(options).map(([name, value]) => [
+          (
+            {
+              includeImages: "include_images",
+              extractDepth: "extract_depth",
+              includeFavicon: "include_favicon",
+              includeUsage: "include_usage",
+              chunksPerSource: "chunks_per_source",
+            } as Record<string, string>
+          )[name] ?? name,
+          value,
+        ]),
       );
+      const response = await apiJSON("https://api.tavily.com/extract", signal, {
+        key,
+        body: {
+          urls: batch,
+          extract_depth: "advanced",
+          format: format as "markdown" | "text",
+          timeout,
+          ...requestOptions,
+        },
+        headers: {
+          ...(key
+            ? { "X-Client-Source": "tavily-js" }
+            : {
+                "X-Tavily-Access-Mode": "keyless",
+                "X-Client-Source": "tavily-js-keyless",
+              }),
+          ...(sessionId ? { "X-Session-Id": String(sessionId) } : {}),
+          ...(humanId ? { "X-Human-Id": String(humanId) } : {}),
+          ...(clientName ? { "X-Client-Name": String(clientName) } : {}),
+        },
+        timeoutMs:
+          typeof timeout === "number" && timeout > 0
+            ? Math.min(REQUEST_TIMEOUT_MS, timeout * 1000)
+            : REQUEST_TIMEOUT_MS,
+      });
+      const payload = isRecord(response) ? response : {};
       return fetchPages(
         batch,
         {
-          results: response.results,
-          failed_results: response.failedResults,
+          results: Array.isArray(payload.results)
+            ? payload.results.filter(isRecord).map((item) => ({
+                url: item.url,
+                title: item.title,
+                rawContent: item.raw_content,
+                images: item.images,
+                favicon: item.favicon,
+              }))
+            : [],
+          failed_results: Array.isArray(payload.failed_results)
+            ? payload.failed_results.filter(isRecord).map((item) => ({
+                url: item.url,
+                error: item.error,
+              }))
+            : [],
         },
         (item) => stringValue(item.rawContent),
         format,

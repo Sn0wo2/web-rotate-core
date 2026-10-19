@@ -21,6 +21,11 @@ export function stringList(value: unknown): string[] {
 }
 
 export const globalsSchema = z.object({
+  cacheWindowSeconds: z.coerce
+    .number()
+    .transform(Math.trunc)
+    .pipe(z.number().nonnegative())
+    .catch(0),
   cleanup: z.enum(["none", "defuddle"]).catch("none"),
   prefer: z.enum(["keyed", "keyless"]).catch("keyless"),
   concurrency: z.coerce

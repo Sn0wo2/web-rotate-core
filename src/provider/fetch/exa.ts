@@ -15,12 +15,12 @@ export const exa = {
   weight: 77,
   formats: ["markdown"],
   options: settingsSchema,
-  run: async ({ settings, key, urls, signal, format }) => {
+  run: async ({ settings, key, urls, signal, format, globals }) => {
     const client = new Exa(requireKey("exa", key));
     const payload = await sdkRequest(signal, () =>
       client.getContents(urls, {
-        maxAgeHours: 0,
         ...settings,
+        maxAgeHours: Math.floor(globals.cacheWindowSeconds / 3600),
         text: { ...settings.text },
       }),
     );

@@ -1,6 +1,6 @@
-import { ApifyClient } from "apify-client";
 import { z } from "zod";
 import { stringValue } from "../../shared/config";
+import { apiJSON } from "../../shared/http";
 import type { FetchProvider } from "./types";
 import { requireKey, sdkRequest } from "../utils";
 
@@ -14,30 +14,55 @@ export const apify = {
   options: settingsSchema,
   run: async ({ settings, key, urls, signal, format }) => {
     const { actorId, ...options } = settings;
-    const client = new ApifyClient({ token: requireKey("apify", key) });
+    const apiKey = requireKey("apify", key);
+    const actorPath = encodeURIComponent(
+      (actorId?.trim() || "apify~website-content-crawler").replace(/\//g, "~"),
+    );
+    const input = {
+      crawlerType: "playwright:firefox",
+      maxCrawlPages: urls.length,
+      maxCrawlDepth: 0,
+      maxRequestRetries: 3,
+      removeCookieWarnings: true,
+      ...(format === "markdown" ? { saveMarkdown: true } : {}),
+      ...(format === "html" ? { saveHtml: true } : {}),
+      proxyConfiguration: { useApifyProxy: true },
+      ...options,
+      startUrls: urls.map((url) => ({ url })),
+    };
     const run = await sdkRequest(
       signal,
-      () =>
-        client.actor(actorId?.trim() || "apify~website-content-crawler").call({
-          crawlerType: "playwright:firefox",
-          maxCrawlPages: urls.length,
-          maxCrawlDepth: 0,
-          maxRequestRetries: 3,
-          removeCookieWarnings: true,
-          ...(format === "markdown" ? { saveMarkdown: true } : {}),
-          ...(format === "html" ? { saveHtml: true } : {}),
-          proxyConfiguration: { useApifyProxy: true },
-          ...options,
-          startUrls: urls.map((url) => ({ url })),
-        }),
+      async (requestSignal) => {
+        let payload = (await apiJSON(
+          `https://api.apify.com/v2/actors/${actorPath}/runs?waitForFinish=60`,
+          requestSignal,
+          { body: input, key: apiKey, timeoutMs: 300_000 },
+        )) as {
+          data: { id: string; status: string; defaultDatasetId: string };
+        };
+        while (
+          ["READY", "RUNNING", "TIMING-OUT", "ABORTING"].includes(
+            payload.data.status,
+          )
+        ) {
+          payload = (await apiJSON(
+            `https://api.apify.com/v2/actor-runs/${encodeURIComponent(payload.data.id)}?waitForFinish=60`,
+            requestSignal,
+            { key: apiKey, timeoutMs: 300_000 },
+          )) as typeof payload;
+        }
+        return payload.data;
+      },
       300_000,
     );
-    const { items } = await sdkRequest(
+    const items = await sdkRequest(
       signal,
-      () =>
-        client
-          .dataset(run.defaultDatasetId)
-          .listItems({ limit: urls.length * 2 }),
+      async (requestSignal) =>
+        (await apiJSON(
+          `https://api.apify.com/v2/datasets/${encodeURIComponent(run.defaultDatasetId)}/items?limit=${urls.length * 2}`,
+          requestSignal,
+          { key: apiKey, timeoutMs: 300_000 },
+        )) as Record<string, unknown>[],
       300_000,
     );
     const dataset = new Map<string, Record<string, unknown>>();

@@ -8,12 +8,19 @@ export const you = {
   id: "you",
   weight: 74,
   run: async ({ settings, key, queries, signal, globals }) => {
+    const extraction = isRecord(settings.extraction) ? settings.extraction : {};
     const payload = await apiJSON("https://ydc-index.io/v1/search", signal, {
       label: "you",
       body: {
-        extraction: { extraction_mode: "highlights" },
         safesearch: "moderate",
         ...settings,
+        extraction: {
+          extraction_mode: "highlights",
+          ...extraction,
+          ...(globals.cacheWindowSeconds === 0
+            ? { extraction_mode: "full_page", extraction_source: "fetch" }
+            : {}),
+        },
         query: queries[0],
         count: searchCount(globals),
       },

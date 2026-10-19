@@ -78,6 +78,43 @@ export function urlParams(
   return endpoint;
 }
 
+export function scrapingbeeURL(
+  path: string,
+  params: Record<string, unknown>,
+): URL {
+  const endpoint = new URL(path, "https://app.scrapingbee.com");
+  for (const [name, value] of Object.entries(params)) {
+    if (
+      value == null ||
+      (typeof value !== "number" &&
+        typeof value !== "boolean" &&
+        (typeof value === "object" ? Object.keys(value).length === 0 : !value))
+    )
+      continue;
+    if (
+      ["extract_rules", "js_scenario", "ai_extract_rules"].includes(name) &&
+      typeof value !== "string"
+    ) {
+      urlParams(endpoint, { [name]: value }, (_, item) => JSON.stringify(item));
+    } else if (Array.isArray(value)) {
+      for (const item of value)
+        if (item != null)
+          endpoint.searchParams.append(`${name}[]`, String(item));
+    } else {
+      urlParams(endpoint, { [name]: value }, (parameter, item) => {
+        if (parameter === "js_snippet" && typeof item === "string") {
+          let binary = "";
+          for (const byte of new TextEncoder().encode(item))
+            binary += String.fromCharCode(byte);
+          return btoa(binary);
+        }
+        return undefined;
+      });
+    }
+  }
+  return endpoint;
+}
+
 export async function sdkRequest<T>(
   signal: AbortSignal,
   run: (signal: AbortSignal) => Promise<T>,

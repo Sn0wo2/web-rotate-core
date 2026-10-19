@@ -53,6 +53,7 @@ export const exa = {
         contents: {
           highlights: { maxCharacters: 1000 },
           ...settings.contents,
+          maxAgeHours: Math.floor(globals.cacheWindowSeconds / 3600),
         },
       }),
     );

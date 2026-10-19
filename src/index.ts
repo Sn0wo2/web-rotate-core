@@ -1,5 +1,5 @@
 export {
-  createWebFetcher,
+  fetchWeb,
   DEFAULT_FETCH_PROVIDER_CONFIG,
 } from "./provider/fetch/fetch";
 export type {
@@ -7,7 +7,7 @@ export type {
   FetchProviderConfig,
 } from "./provider/fetch/fetch";
 export {
-  createWebSearcher,
+  searchWeb,
   DEFAULT_SEARCH_PROVIDER_CONFIG,
 } from "./provider/search/search";
 export type {

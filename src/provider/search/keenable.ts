@@ -10,11 +10,11 @@ export const keenable = {
   keyless: true,
   run: async ({ settings, key, queries, signal, globals }) => {
     const response = await sdkRequest(signal, (requestSignal) =>
-      new Keenable(
-        key
-          ? { apiKey: key, clientSource: "web-rotate-core" }
-          : { clientSource: "web-rotate-core" },
-      ).search(queries[0], {
+      new Keenable({
+        apiKey: key ?? "",
+        baseUrl: "https://api.keenable.ai",
+        clientSource: "web-rotate-core",
+      }).search(queries[0], {
         mode: "pro",
         snippetMaxLength: 1000,
         ...settings,

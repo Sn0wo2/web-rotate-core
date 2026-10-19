@@ -9,10 +9,12 @@ export type Provider<Settings = Record<string, unknown>> = {
   options?: z.ZodType<Settings> | undefined;
 };
 
-export type SettingsOf<P> = P extends {
-  run: (input: { settings: infer S }) => unknown;
-}
-  ? S
+export type SettingsOf<P> = P extends { run: infer R }
+  ? R extends (input: infer I) => unknown
+    ? I extends { settings: infer S }
+      ? S
+      : Record<string, unknown>
+    : Record<string, unknown>
   : Record<string, unknown>;
 
 export type ProviderEntry<Settings = Record<string, unknown>> = {
@@ -23,5 +25,4 @@ export type ProviderEntry<Settings = Record<string, unknown>> = {
 export type ProviderRoute<P extends Provider<unknown>> = P & {
   key: string | undefined;
   settings: Record<string, unknown>;
-  routeID: string;
 };

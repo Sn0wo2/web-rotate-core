@@ -7,6 +7,7 @@ import { requireKey, sdkRequest } from "../utils";
 import { fetchOne, providerResult } from "./utils";
 
 const settingsSchema = z.looseObject({
+  cache: z.looseObject({ maxAgeSeconds: z.number().optional() }).optional(),
   outputs: z.record(z.string(), z.unknown()).optional(),
 });
 type HyperbrowserFetchSettings = z.output<typeof settingsSchema>;
@@ -17,14 +18,19 @@ export const hyperbrowser = {
   formats: ["html", "markdown"],
   options: settingsSchema,
   run: fetchOne<HyperbrowserFetchSettings>(
-    async ({ settings, key, url, signal, format }) => {
+    async ({ settings, key, url, signal, format, globals }) => {
       const client = new Hyperbrowser({
         apiKey: requireKey("hyperbrowser", key),
+        baseUrl: "https://api.hyperbrowser.ai",
       });
       const payload = await sdkRequest(signal, () =>
         client.web.fetch({
           ...settings,
           url,
+          cache: {
+            ...settings.cache,
+            maxAgeSeconds: globals.cacheWindowSeconds,
+          },
           outputs: {
             ...settings.outputs,
             formats: [format as "html" | "markdown"],

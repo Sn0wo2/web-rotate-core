@@ -1,14 +1,23 @@
 import { compact } from "es-toolkit/array";
-import Parallel from "parallel-web";
 import { z } from "zod";
 import { stringValue } from "../../shared/config";
+import { apiJSON } from "../../shared/http";
 import type { FetchProvider } from "./types";
 import { mcpJSON, MCP_FETCH_TIMEOUT_MS } from "../mcp";
-import { requireKey, sdkRequest } from "../utils";
+import { requireKey } from "../utils";
 import { fetchBatches, fetchPages } from "./utils";
 
 const settingsSchema = z.looseObject({
-  advanced_settings: z.record(z.string(), z.unknown()).optional(),
+  advanced_settings: z
+    .looseObject({
+      fetch_policy: z
+        .looseObject({
+          max_age_seconds: z.number().optional(),
+          disable_cache_fallback: z.boolean().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 type ParallelFetchSettings = z.output<typeof settingsSchema>;
 
@@ -40,20 +49,27 @@ export const parallel = {
       });
     }
     const { advanced_settings: advanced, ...rest } = settings;
-    const client = new Parallel({ apiKey: requireKey("parallel", key) });
+    const apiKey = requireKey("parallel", key);
     return fetchBatches(urls, 20, globals, signal, async (batch) => {
-      const payload = await sdkRequest(signal, (requestSignal) =>
-        client.extract(
-          {
+      const payload = await apiJSON(
+        "https://api.parallel.ai/v1/extract",
+        signal,
+        {
+          headers: { "x-api-key": apiKey },
+          body: {
             ...rest,
             urls: batch,
             advanced_settings: {
               full_content: true,
               ...advanced,
+              fetch_policy: {
+                ...advanced?.fetch_policy,
+                max_age_seconds: Math.max(600, globals.cacheWindowSeconds),
+                disable_cache_fallback: true,
+              },
             },
           },
-          { signal: requestSignal },
-        ),
+        },
       );
       return fetchPages(batch, payload, content, format);
     });

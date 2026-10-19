@@ -19,7 +19,7 @@ export const jina = {
   formats: ["text", "markdown", "html"],
   options: settingsSchema,
   run: fetchOne<JinaSettings>(
-    async ({ settings, key, url, signal, format }) => {
+    async ({ settings, key, url, signal, format, globals }) => {
       const { headers } = settings;
       const response = await fetch(`https://r.jina.ai/${url}`, {
         headers: {
@@ -34,6 +34,9 @@ export const jina = {
           "X-User-Agent": TARGET_USER_AGENT,
           "X-Respond-With": format,
           ...headers,
+          ...(globals.cacheWindowSeconds === 0
+            ? { "X-No-Cache": "true" }
+            : { "X-Cache-Tolerance": String(globals.cacheWindowSeconds) }),
         },
         signal,
         redirect: "error",

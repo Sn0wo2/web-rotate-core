@@ -67,12 +67,11 @@ export function providerRoutes<P extends Provider<unknown>>(
         globals.prefer === "keyless"
           ? [...keyless, ...keyed]
           : [...keyed, ...keyless]
-      ).map((key, index) => ({
+      ).map((key) => ({
         ...provider,
         key,
         settings: entry.settings,
         weight: entry.weight,
-        routeID: `${provider.id}[${index}]`,
       }));
     });
   return compact(zip(...groups).flat());
@@ -80,13 +79,8 @@ export function providerRoutes<P extends Provider<unknown>>(
 
 export function selectRoutes<P extends Provider<unknown>>(
   pool: readonly ProviderRoute<P>[],
-  failures: ReadonlyMap<string, number>,
 ): ProviderRoute<P>[] {
-  const now = Date.now();
-  const ready = pool.filter(
-    (route) => (failures.get(route.routeID) ?? 0) <= now,
-  );
-  return orderBy(ready.length ? ready : pool, ["weight"], ["desc"]);
+  return orderBy(pool, ["weight"], ["desc"]);
 }
 
 export function resolveMaxAttempts(globals: Globals, routes: number): number {

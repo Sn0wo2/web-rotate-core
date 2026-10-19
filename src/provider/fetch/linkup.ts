@@ -1,8 +1,8 @@
 import get from "es-toolkit/compat/get";
-import { LinkupClient } from "linkup-sdk";
 import { stringValue } from "../../shared/config";
+import { apiJSON } from "../../shared/http";
 import type { FetchProvider } from "./types";
-import { requireKey, sdkRequest } from "../utils";
+import { requireKey } from "../utils";
 import { fetchOne, providerResult } from "./utils";
 
 export const linkup = {
@@ -11,17 +11,37 @@ export const linkup = {
   formats: ["markdown"],
   run: fetchOne<Record<string, unknown>>(
     async ({ settings, key, url, signal }) => {
-      const client = new LinkupClient({
-        apiKey: requireKey("linkup", key),
+      const {
+        url: fetchURL,
+        mode,
+        renderJs,
+        includeRawContent,
+        includeRawHtml,
+        extractImages,
+        schema,
+        instructions,
+      }: Record<string, unknown> = { url, ...settings };
+      const response = await apiJSON("https://api.linkup.so/v1/fetch", signal, {
+        key: requireKey("linkup", key),
+        body: {
+          url: fetchURL,
+          ...(mode !== undefined ? { mode } : {}),
+          ...(renderJs !== undefined ? { renderJs } : {}),
+          ...(includeRawContent !== undefined ? { includeRawContent } : {}),
+          ...(includeRawHtml !== undefined ? { includeRawHtml } : {}),
+          ...(extractImages !== undefined ? { extractImages } : {}),
+          ...(schema !== undefined
+            ? {
+                schema:
+                  typeof schema === "string" ? schema : JSON.stringify(schema),
+              }
+            : {}),
+          ...(instructions !== undefined ? { instructions } : {}),
+        },
       });
-      const response = await sdkRequest(signal, () =>
-        client.fetch({
-          url,
-          ...settings,
-        }),
-      );
       return providerResult(
-        stringValue(get(response, "content")) ?? stringValue(response.markdown),
+        stringValue(get(response, "content")) ??
+          stringValue(get(response, "markdown")),
         "markdown",
       );
     },

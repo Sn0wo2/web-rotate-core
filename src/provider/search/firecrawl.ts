@@ -1,8 +1,8 @@
-import get from "es-toolkit/compat/get";
-import Firecrawl from "@mendable/firecrawl-js";
+import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { z } from "zod";
 import type { SearchProvider } from "./types";
-import { firstList, sdkRequest } from "../utils";
+import { apiJSON } from "../../shared/http";
+import { firstList } from "../utils";
 import { searchCount, searchResponse } from "./utils";
 
 const settingsSchema = z.looseObject({ keyless: z.boolean().optional() });
@@ -16,13 +16,79 @@ export const firecrawl = {
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
     const { keyless, ...options } = settings;
-    const client = new Firecrawl(key ? { apiKey: key } : {});
-    const payload = await sdkRequest(signal, () =>
-      client.search(queries[0], {
-        ...options,
-        limit: searchCount(globals),
-      }),
+    const {
+      query: configuredQuery,
+      toolDetail,
+      domainTools,
+      sources,
+      categories,
+      includeDomains,
+      excludeDomains,
+      tbs,
+      location,
+      country,
+      ignoreInvalidURLs,
+      timeout,
+      highlights,
+      scrapeOptions,
+      enterprise,
+      threatProtection,
+      integration,
+      origin,
+    } = options;
+    const query = configuredQuery === undefined ? queries[0] : configuredQuery;
+    if (!query || !(query as string).trim())
+      throw new Error("Query cannot be empty");
+    const payload = await apiJSON(
+      "https://api.firecrawl.dev/v2/search",
+      signal,
+      {
+        key,
+        body: {
+          query,
+          ...(toolDetail != null ? { toolDetail } : {}),
+          ...(domainTools != null ? { domainTools } : {}),
+          ...(sources ? { sources } : {}),
+          ...(categories ? { categories } : {}),
+          ...(includeDomains ? { includeDomains } : {}),
+          ...(excludeDomains ? { excludeDomains } : {}),
+          limit: searchCount(globals),
+          ...(tbs != null ? { tbs } : {}),
+          ...(location != null ? { location } : {}),
+          ...(country != null ? { country } : {}),
+          ...(ignoreInvalidURLs != null ? { ignoreInvalidURLs } : {}),
+          ...(timeout != null ? { timeout } : {}),
+          ...(highlights != null ? { highlights } : {}),
+          ...(integration && (integration as string).trim()
+            ? { integration: (integration as string).trim() }
+            : {}),
+          ...(origin ? { origin } : {}),
+          ...(enterprise ? { enterprise } : {}),
+          ...(threatProtection != null ? { threatProtection } : {}),
+          ...(scrapeOptions ? { scrapeOptions } : {}),
+        },
+      },
     );
-    return searchResponse(payload, firstList(get(payload, "data")));
+    const response = isRecord(payload) ? payload : {};
+    if (!response.success) {
+      const error = response.error || response.message;
+      throw new Error(
+        typeof error === "string" ? error : "Firecrawl search failed",
+      );
+    }
+    const data = isRecord(response.data) ? response.data : {};
+    const agentHints = response.agent_hints;
+    return searchResponse(
+      {
+        ...(Array.isArray(agentHints) &&
+        agentHints.every((hint) => typeof hint === "string")
+          ? { agent_hints: [...agentHints] as string[] }
+          : {}),
+        ...(response.warning ? { warning: response.warning } : {}),
+      },
+      firstList(data).map((item) =>
+        item && typeof item === "object" ? item : { url: item },
+      ),
+    );
   },
 } satisfies SearchProvider<FirecrawlSearchSettings>;

@@ -100,6 +100,7 @@ const SERP_ENGINES: {
           headers: { "User-Agent": SERP_USER_AGENT },
           timeout: 30_000,
           response_timeout: 30_000,
+          use_proxy_from_env_var: false,
         },
       );
       return results.results.slice(0, count).map((result) => ({

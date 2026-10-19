@@ -6,6 +6,8 @@ import { requireKey, sdkRequest } from "../utils";
 import { fetchOne, providerResult } from "./utils";
 
 const settingsSchema = z.looseObject({
+  cache: z.boolean().optional(),
+  cache_ttl: z.number().optional(),
   headers: z.record(z.string(), z.string()).optional(),
   js_scenario: z
     .union([z.string(), z.record(z.string(), z.unknown())])
@@ -22,7 +24,7 @@ export const scrapfly = {
   formats: ["html", "markdown", "text"],
   options: settingsSchema,
   run: fetchOne<ScrapflyFetchSettings>(
-    async ({ settings, key, url, signal, format }) => {
+    async ({ settings, key, url, signal, format, globals }) => {
       const client = new ScrapflyClient({
         key: requireKey("scrapfly", key),
       });
@@ -35,6 +37,10 @@ export const scrapfly = {
             proxy_pool: "datacenter",
             format: format === "html" ? "raw" : format,
             ...settings,
+            cache: globals.cacheWindowSeconds > 0,
+            ...(globals.cacheWindowSeconds > 0
+              ? { cache_ttl: globals.cacheWindowSeconds }
+              : {}),
             headers: { "user-agent": TARGET_USER_AGENT, ...settings.headers },
           } as ConstructorParameters<typeof ScrapeConfig>[0]),
         ),
