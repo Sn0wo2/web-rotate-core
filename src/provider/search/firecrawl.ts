@@ -76,7 +76,6 @@ export const firecrawl = {
         typeof error === "string" ? error : "Firecrawl search failed",
       );
     }
-    const data = isRecord(response.data) ? response.data : {};
     const agentHints = response.agent_hints;
     return searchResponse(
       {
@@ -86,7 +85,7 @@ export const firecrawl = {
           : {}),
         ...(response.warning ? { warning: response.warning } : {}),
       },
-      firstList(data).map((item) =>
+      firstList(response.data).map((item) =>
         item && typeof item === "object" ? item : { url: item },
       ),
     );

@@ -20,7 +20,6 @@ export const scrapingbee = {
             : {}),
         url,
       };
-      delete params.cookies;
       const endpoint = scrapingbeeURL("/api/v1/", params);
       const response = await fetch(endpoint, {
         headers: {

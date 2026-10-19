@@ -64,10 +64,10 @@ export const openai = {
               search_context_size: search_context_size ?? "medium",
               ...(filters ? { filters } : {}),
               ...(user_location ? { user_location } : {}),
-              ...(globals.cacheWindowSeconds === 0
-                ? { external_web_access: true }
-                : external_web_access != null
-                  ? { external_web_access }
+              ...(external_web_access != null
+                ? { external_web_access }
+                : globals.cacheWindowSeconds === 0
+                  ? { external_web_access: true }
                   : {}),
               ...(return_token_budget != null ? { return_token_budget } : {}),
             },

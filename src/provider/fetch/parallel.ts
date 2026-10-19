@@ -64,8 +64,15 @@ export const parallel = {
               ...advanced,
               fetch_policy: {
                 ...advanced?.fetch_policy,
-                max_age_seconds: Math.max(600, globals.cacheWindowSeconds),
-                disable_cache_fallback: true,
+                max_age_seconds: Math.max(
+                  600,
+                  Math.trunc(
+                    advanced?.fetch_policy?.max_age_seconds ??
+                      globals.cacheWindowSeconds,
+                  ),
+                ),
+                disable_cache_fallback:
+                  advanced?.fetch_policy?.disable_cache_fallback ?? true,
               },
             },
           },

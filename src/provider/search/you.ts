@@ -16,10 +16,10 @@ export const you = {
         ...settings,
         extraction: {
           extraction_mode: "highlights",
-          ...extraction,
           ...(globals.cacheWindowSeconds === 0
             ? { extraction_mode: "full_page", extraction_source: "fetch" }
             : {}),
+          ...extraction,
         },
         query: queries[0],
         count: searchCount(globals),
