@@ -60,6 +60,7 @@ export const DEFAULT_FETCH_PROVIDER_CONFIG: DefaultFetchProviderConfig = {
     deepseek: {},
     bocha: {},
     native: {},
+    zhipu: {},
   },
 };
 

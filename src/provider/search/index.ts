@@ -21,6 +21,7 @@ import { doubao } from "./doubao";
 import { deepseek } from "./deepseek";
 import { openai } from "./openai";
 import { native } from "./native";
+import { zhipu } from "./zhipu";
 
 type Registered<P, ID extends string> = Omit<P, "id"> & { id: ID };
 
@@ -48,4 +49,5 @@ export const SEARCH_PROVIDERS = [
   deepseek as Registered<typeof deepseek, "deepseek">,
   openai as Registered<typeof openai, "openai">,
   native as Registered<typeof native, "native">,
+  zhipu as Registered<typeof zhipu, "zhipu">,
 ] as const;

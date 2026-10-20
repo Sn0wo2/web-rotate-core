@@ -16,6 +16,7 @@ import { linkup } from "./linkup";
 import { deepseek } from "./deepseek";
 import { bocha } from "./bocha";
 import { native } from "./native";
+import { zhipu } from "./zhipu";
 
 type Registered<P, ID extends string> = Omit<P, "id"> & { id: ID };
 
@@ -38,4 +39,5 @@ export const FETCH_PROVIDERS = [
   deepseek as Registered<typeof deepseek, "deepseek">,
   bocha as Registered<typeof bocha, "bocha">,
   native as Registered<typeof native, "native">,
+  zhipu as Registered<typeof zhipu, "zhipu">,
 ] as const;

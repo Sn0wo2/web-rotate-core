@@ -64,6 +64,7 @@ export const DEFAULT_SEARCH_PROVIDER_CONFIG: DefaultSearchProviderConfig = {
     deepseek: {},
     openai: {},
     native: {},
+    zhipu: {},
   },
 };
 
