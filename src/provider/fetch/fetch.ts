@@ -58,6 +58,7 @@ export const DEFAULT_FETCH_PROVIDER_CONFIG: DefaultFetchProviderConfig = {
     apify: {},
     linkup: {},
     deepseek: {},
+    bocha: {},
     native: {},
   },
 };

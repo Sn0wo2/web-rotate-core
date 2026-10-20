@@ -14,6 +14,7 @@ import { brightdata } from "./brightdata";
 import { apify } from "./apify";
 import { linkup } from "./linkup";
 import { deepseek } from "./deepseek";
+import { bocha } from "./bocha";
 import { native } from "./native";
 
 type Registered<P, ID extends string> = Omit<P, "id"> & { id: ID };
@@ -35,5 +36,6 @@ export const FETCH_PROVIDERS = [
   apify as Registered<typeof apify, "apify">,
   linkup as Registered<typeof linkup, "linkup">,
   deepseek as Registered<typeof deepseek, "deepseek">,
+  bocha as Registered<typeof bocha, "bocha">,
   native as Registered<typeof native, "native">,
 ] as const;
