@@ -1,7 +1,8 @@
 import { apiJSON, REQUEST_TIMEOUT_MS } from "../../shared/http";
 import type { SearchProvider } from "./types";
 import { mcpJSON } from "../mcp";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 export const tavily = {
   id: "tavily",
@@ -16,7 +17,7 @@ export const tavily = {
         {
           query: queries[0],
           search_depth: "basic",
-          max_results: searchCount(globals, 20),
+          max_results: clamp(globals.searchResults, 1, 20),
         },
         signal,
       );
@@ -72,7 +73,7 @@ export const tavily = {
         include_raw_content: false,
         auto_parameters: false,
         topic: "general",
-        max_results: searchCount(globals, 20),
+        max_results: clamp(globals.searchResults, 1, 20),
         ...(maxAgeHours !== undefined || maxHours !== undefined
           ? {
               max_age_hours: maxAgeHours != null ? maxAgeHours : maxHours,

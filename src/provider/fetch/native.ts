@@ -3,11 +3,8 @@ import {
   readBodyLimited,
   TARGET_USER_AGENT,
 } from "../../shared/http";
-import {
-  errorMessage,
-  mapConcurrent,
-  requestConcurrency,
-} from "../../shared/utils";
+import { clamp } from "es-toolkit/math";
+import { mapConcurrent } from "../../shared/utils";
 import { fetchManualRedirects } from "./utils";
 import type { FetchPage } from "./types";
 import type { FetchProvider } from "./types";
@@ -84,7 +81,7 @@ export const native = {
           if (signal.aborted) throw error;
           return {
             url,
-            error: errorMessage(error),
+            error: error instanceof Error ? error.message : String(error),
             ...(error instanceof HTTPError
               ? {
                   metadata: {
@@ -96,7 +93,7 @@ export const native = {
           };
         }
       },
-      requestConcurrency(globals),
+      clamp(globals.concurrency, 1, 16),
       signal,
     ),
 } satisfies FetchProvider;

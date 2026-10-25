@@ -1,7 +1,7 @@
 import get from "es-toolkit/compat/get";
 import type { SearchProvider } from "./types";
-import { bearer } from "../utils";
-import { restSearch, searchCount } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { restSearch } from "./utils";
 
 export const bocha = {
   id: "bocha",
@@ -12,9 +12,9 @@ export const bocha = {
       summary: true,
       ...settings,
       query: queries[0],
-      count: searchCount(globals, 50),
+      count: clamp(globals.searchResults, 1, 50),
     }),
-    bearer,
+    (key) => ({ ...(key ? { Authorization: `Bearer ${key}` } : {}) }),
     (payload) => get(payload, "data.webPages.value"),
   ),
 } satisfies SearchProvider;

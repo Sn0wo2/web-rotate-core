@@ -2,8 +2,9 @@ import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { z } from "zod";
 import { stringValue } from "../../shared/config";
 import type { SearchProvider } from "./types";
-import { bearer, firstList, requireKey } from "../utils";
-import { restSearch, searchCount } from "./utils";
+import { firstList, requireKey } from "../utils";
+import { clamp } from "es-toolkit/math";
+import { restSearch } from "./utils";
 
 const settingsSchema = z.strictObject({
   localization: z.string().optional(),
@@ -20,9 +21,11 @@ export const deepseek = {
     ({ settings, queries, globals }) => ({
       ...settings,
       query: queries[0],
-      count: searchCount(globals, 50),
+      count: clamp(globals.searchResults, 1, 50),
     }),
-    (key) => bearer(requireKey("deepseek", key)),
+    (key) => ({
+      Authorization: `Bearer ${requireKey("deepseek", key)}`,
+    }),
     (payload) =>
       firstList(payload)
         .filter(isRecord)

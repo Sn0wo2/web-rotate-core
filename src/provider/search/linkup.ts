@@ -1,7 +1,8 @@
 import { apiJSON } from "../../shared/http";
 import type { SearchProvider } from "./types";
 import { requireKey } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 export const linkup = {
   id: "linkup",
@@ -21,7 +22,7 @@ export const linkup = {
     }: Record<string, unknown> = {
       depth: "standard",
       ...settings,
-      maxResults: searchCount(globals),
+      maxResults: clamp(globals.searchResults, 1, 100),
     };
     const payload = await apiJSON("https://api.linkup.so/v1/search", signal, {
       key: requireKey("linkup", key),

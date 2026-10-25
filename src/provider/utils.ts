@@ -6,10 +6,6 @@ export function requireKey(provider: string, key: string | undefined): string {
   return key;
 }
 
-export function bearer(key: string | undefined): Record<string, string> {
-  return key ? { Authorization: `Bearer ${key}` } : {};
-}
-
 export function firstList(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   if (!isRecord(payload)) return [];

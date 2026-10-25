@@ -2,7 +2,8 @@ import { z } from "zod";
 import { apiJSON } from "../../shared/http";
 import type { SearchProvider } from "./types";
 import { requireKey } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 const settingsSchema = z.looseObject({
   search_context_size: z.string().optional(),
@@ -25,8 +26,9 @@ export const perplexity = {
         search_type: "fast",
         ...options,
         query: queries.length === 1 ? queries[0] : queries,
-        max_results: searchCount(
-          globals,
+        max_results: clamp(
+          globals.searchResults,
+          1,
           options.search_type === "people" ? 50 : 20,
         ),
         ...(options.max_tokens == null && options.max_tokens_per_page == null

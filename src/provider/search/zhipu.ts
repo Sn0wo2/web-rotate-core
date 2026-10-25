@@ -4,9 +4,8 @@ import { apiJSON } from "../../shared/http";
 import { stringValue } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { requireKey } from "../utils";
-import { searchCount, searchResponse } from "./utils";
-
-const BASE_URL = "https://open.bigmodel.cn/api/paas/v4";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 const settingsSchema = z.looseObject({
   baseUrl: z.string().optional(),
@@ -19,14 +18,15 @@ export const zhipu = {
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
     const { baseUrl: configuredBaseUrl, ...options } = settings;
-    const baseUrl = stringValue(configuredBaseUrl) ?? BASE_URL;
+    const baseUrl =
+      stringValue(configuredBaseUrl) ?? "https://open.bigmodel.cn/api/paas/v4";
     const international = new URL(baseUrl).hostname === "api.z.ai";
     const body: Record<string, unknown> = {
       search_engine: international ? "search-prime" : "search_std",
       ...(!international ? { search_intent: false } : {}),
       ...options,
       search_query: queries[0],
-      count: searchCount(globals, 50),
+      count: clamp(globals.searchResults, 1, 50),
     };
     if (international) delete body.search_intent;
 

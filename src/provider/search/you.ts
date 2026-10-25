@@ -2,7 +2,8 @@ import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { apiJSON } from "../../shared/http";
 import type { SearchProvider } from "./types";
 import { requireKey } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 export const you = {
   id: "you",
@@ -22,7 +23,7 @@ export const you = {
           ...extraction,
         },
         query: queries[0],
-        count: searchCount(globals),
+        count: clamp(globals.searchResults, 1, 100),
       },
       headers: { "X-API-Key": requireKey("you", key) },
     });

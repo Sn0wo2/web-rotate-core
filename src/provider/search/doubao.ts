@@ -1,8 +1,8 @@
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { stringValue } from "../../shared/config";
 import type { SearchProvider } from "./types";
-import { bearer } from "../utils";
-import { restSearch, searchCount } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { restSearch } from "./utils";
 
 export const doubao = {
   id: "doubao",
@@ -14,9 +14,9 @@ export const doubao = {
       NeedSummary: true,
       ...settings,
       Query: queries[0],
-      Count: searchCount(globals),
+      Count: clamp(globals.searchResults, 1, 100),
     }),
-    bearer,
+    (key) => ({ ...(key ? { Authorization: `Bearer ${key}` } : {}) }),
     (payload) => {
       const result = isRecord(payload) ? payload.Result : undefined;
       const rows = isRecord(result) ? result.WebResults : undefined;

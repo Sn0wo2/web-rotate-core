@@ -2,7 +2,8 @@ import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { Keenable } from "keenable";
 import type { SearchProvider } from "./types";
 import { sdkRequest } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 export const keenable = {
   id: "keenable",
@@ -26,7 +27,7 @@ export const keenable = {
       (Array.isArray(response.raw.results)
         ? response.raw.results.filter(isRecord)
         : []
-      ).slice(0, searchCount(globals, 50)),
+      ).slice(0, clamp(globals.searchResults, 1, 50)),
     );
   },
 } satisfies SearchProvider;

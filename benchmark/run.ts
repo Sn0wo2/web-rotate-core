@@ -6,7 +6,7 @@ import type {
   FetchProviderConfig,
   ProviderEntry,
 } from "../src/index";
-import { errorMessage, mapConcurrent } from "../src/shared/utils";
+import { mapConcurrent } from "../src/shared/utils";
 
 const DEFAULT_MODEL = "jev-1.13";
 const FETCH_CONCURRENCY = 2;
@@ -262,7 +262,7 @@ async function fetchProvider(
     );
   } catch (error) {
     if (signal.aborted) throw error;
-    const message = errorMessage(error);
+    const message = error instanceof Error ? error.message : String(error);
     return urls.map((url) => failed(url, message));
   }
 }
@@ -382,7 +382,7 @@ async function judgeRead(
       }
       return { answers, usage: payload.usage };
     } catch (error) {
-      lastError = errorMessage(error);
+      lastError = error instanceof Error ? error.message : String(error);
     }
   }
   throw new Error(
@@ -486,11 +486,13 @@ async function judgeCandidate(
       } catch (error) {
         if (
           budget > 4_000 &&
-          /max_tokens_exceeded/i.test(errorMessage(error))
+          /max_tokens_exceeded/i.test(
+            error instanceof Error ? error.message : String(error),
+          )
         ) {
           continue;
         }
-        audit.error = errorMessage(error);
+        audit.error = error instanceof Error ? error.message : String(error);
         break;
       }
     }

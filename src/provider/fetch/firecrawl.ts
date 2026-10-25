@@ -13,8 +13,6 @@ export const firecrawl = {
   run: fetchOne<Record<string, unknown>>(
     async ({ settings, key, url, signal, format, globals }) => {
       const providerFormat = format === "html" ? "rawHtml" : "markdown";
-      const data = (payload: unknown): Record<string, unknown> =>
-        isRecord(payload) && isRecord(payload.data) ? payload.data : {};
       if (key && !Object.keys(settings).length) {
         const result = await mcpCall(
           "https://mcp.firecrawl.dev/v2/mcp",
@@ -33,7 +31,9 @@ export const firecrawl = {
           result.content.find((part) => part.type === "text")?.text ?? "";
         let content: string | undefined;
         try {
-          const item = data(result.structuredContent ?? JSON.parse(text));
+          const parsed = result.structuredContent ?? JSON.parse(text);
+          const item =
+            isRecord(parsed) && isRecord(parsed.data) ? parsed.data : {};
           content = stringValue(
             providerFormat === "rawHtml"
               ? (item.rawHtml ?? item.html)
@@ -73,7 +73,8 @@ export const firecrawl = {
             stringValue(payload.message) ??
             "Firecrawl scrape failed",
         );
-      const document = data(payload);
+      const document =
+        isRecord(payload) && isRecord(payload.data) ? payload.data : {};
       return providerResult(
         stringValue(
           providerFormat === "rawHtml"

@@ -6,8 +6,6 @@ import type { FetchProvider } from "./types";
 import { requireKey } from "../utils";
 import { fetchOne, providerResult } from "./utils";
 
-const BASE_URL = "https://open.bigmodel.cn/api/paas/v4";
-
 const settingsSchema = z.looseObject({
   baseUrl: z.string().optional(),
 });
@@ -21,7 +19,9 @@ export const zhipu = {
   run: fetchOne<ZhipuFetchSettings>(
     async ({ settings, key, url, signal, format }) => {
       const { baseUrl: configuredBaseUrl, ...options } = settings;
-      const baseUrl = stringValue(configuredBaseUrl) ?? BASE_URL;
+      const baseUrl =
+        stringValue(configuredBaseUrl) ??
+        "https://open.bigmodel.cn/api/paas/v4";
       const payload = await apiJSON(
         `${baseUrl.replace(/\/+$/, "")}/reader`,
         signal,

@@ -1,4 +1,3 @@
-import { clamp } from "es-toolkit/math";
 import { compact } from "es-toolkit/array";
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { apiJSON } from "../../shared/http";
@@ -7,10 +6,6 @@ import { stringValue } from "../../shared/config";
 import type { URLList } from "../../shared/types";
 import type { SearchProvider, SearchResponse, SearchResult } from "./types";
 import { firstList, responseMetadata } from "../utils";
-
-export function searchCount(globals: Globals, maximum = 100): number {
-  return clamp(globals.searchResults, 1, maximum);
-}
 
 const URL_KEYS = ["url", "link", "pageUrl", "page_url"] as const;
 const TITLE_KEYS = ["title", "name"] as const;
@@ -78,25 +73,23 @@ function parseTimestamp(value: unknown): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function firstDefined<T>(values: readonly T[]): T | undefined {
-  return values.find((value) => value != null);
-}
-
 export function normalizeResults(payload: unknown): SearchResult[] {
   return firstList(payload)
     .filter(isRecord)
     .flatMap((item): SearchResult[] => {
-      const url = firstDefined(URL_KEYS.map((key) => stringValue(item[key])));
-      if (!url) return [];
-      const title = firstDefined(
-        TITLE_KEYS.map((key) => stringValue(item[key])),
+      const url = URL_KEYS.map((key) => stringValue(item[key])).find(
+        (value) => value != null,
       );
-      const content = firstDefined([
+      if (!url) return [];
+      const title = TITLE_KEYS.map((key) => stringValue(item[key])).find(
+        (value) => value != null,
+      );
+      const content = [
         ...CONTENT_KEYS.map((key) => stringValue(item[key])),
         typeof item.snippet === "string"
           ? stringValue(item.snippet)
           : undefined,
-      ]);
+      ].find((value) => value != null);
       const snippets = compact(
         (Array.isArray(item.snippets)
           ? item.snippets
@@ -113,11 +106,11 @@ export function normalizeResults(payload: unknown): SearchResult[] {
               : undefined),
         ),
       );
-      const published = firstDefined(
-        PUBLISHED_KEYS.map((key) => parseTimestamp(item[key])),
-      );
-      const updated = firstDefined(
-        UPDATED_KEYS.map((key) => parseTimestamp(item[key])),
+      const published = PUBLISHED_KEYS.map((key) =>
+        parseTimestamp(item[key]),
+      ).find((value) => value != null);
+      const updated = UPDATED_KEYS.map((key) => parseTimestamp(item[key])).find(
+        (value) => value != null,
       );
       const metadata = Object.fromEntries(
         Object.entries(item).filter(

@@ -1,22 +1,12 @@
-import { chunk, uniq } from "es-toolkit/array";
+import { clamp } from "es-toolkit/math";
+import { chunk, orderBy, uniq } from "es-toolkit/array";
 import { HTTPError, timedSignal } from "../../shared/http";
 import { RotateConfigError, globalsSchema } from "../../shared/config";
-import type { Globals } from "../../shared/config";
-import {
-  errorMessage,
-  mapConcurrent,
-  requestConcurrency,
-} from "../../shared/utils";
+import { mapConcurrent } from "../../shared/utils";
 import type { URLList } from "../../shared/types";
-import {
-  providerRoutes,
-  resolveMaxAttempts,
-  resolveProviderEntries,
-  selectRoutes,
-} from "../rotation";
+import { providerRoutes, resolveProviderEntries } from "../rotation";
 import type { ProviderEntry } from "../types";
 import { SEARCH_PROVIDERS } from "./index";
-import { searchCount } from "./utils";
 import type {
   SearchOutcome,
   SearchProvider,
@@ -79,7 +69,7 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
   config?: SearchProviderConfig<P> | undefined;
   implementations?: P | undefined;
 }): Promise<SearchOutcome> {
-  const globals: Globals = globalsSchema.parse(config);
+  const globals = globalsSchema.parse(config);
   const registry = new Map<string, SearchProvider>();
   for (const provider of [...SEARCH_PROVIDERS, ...(implementations ?? [])])
     registry.set(provider.id, provider);
@@ -94,9 +84,12 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
   if (!queries.length || queries.some((query) => !query.trim()))
     throw new RotateConfigError("search queries must not be empty");
   const uniqueQueries = uniq(queries.map((query) => query.trim()));
-  const maxResults = searchCount(globals);
-  const candidates = selectRoutes(pool);
-  const maxAttempts = resolveMaxAttempts(globals, candidates.length);
+  const maxResults = clamp(globals.searchResults, 1, 100);
+  const candidates = orderBy(pool, ["weight"], ["desc"]);
+  const maxAttempts = Math.max(
+    1,
+    Math.min(globals.maxAttempts, candidates.length),
+  );
   const pending = new Set(uniqueQueries);
   const blocked = new Map<string, Error>();
   const errors = new Map<string, string>();
@@ -135,11 +128,11 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
             blocked.set(route.id, error);
           return {
             group,
-            error: errorMessage(error),
+            error: error instanceof Error ? error.message : String(error),
           };
         }
       },
-      requestConcurrency(globals),
+      clamp(globals.concurrency, 1, 16),
       signal,
     );
     signal.throwIfAborted();

@@ -5,10 +5,10 @@ import {
 } from "duck-duck-scrape";
 import { XMLParser } from "fast-xml-parser";
 import { HTTPError, timedSignal } from "../../shared/http";
-import { mapConcurrent, requestConcurrency } from "../../shared/utils";
+import { mapConcurrent } from "../../shared/utils";
 import type { SearchResult } from "./types";
 import type { SearchProvider } from "./types";
-import { searchCount } from "./utils";
+import { clamp } from "es-toolkit/math";
 
 const SERP_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -119,7 +119,7 @@ export const native = {
   weight: 70,
   keyless: true,
   run: async ({ queries, signal, globals }) => {
-    const count = searchCount(globals);
+    const count = clamp(globals.searchResults, 1, 100);
     const groups = await mapConcurrent(
       queries,
       async (query): Promise<SearchResult[]> => {
@@ -133,7 +133,7 @@ export const native = {
         }
         throw new Error("all native SERP engines failed");
       },
-      requestConcurrency(globals),
+      clamp(globals.concurrency, 1, 16),
       signal,
     );
     return { results: groups.flat() };

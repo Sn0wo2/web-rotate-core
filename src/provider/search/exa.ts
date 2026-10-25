@@ -3,7 +3,8 @@ import { z } from "zod";
 import type { SearchProvider } from "./types";
 import { mcpCall } from "../mcp";
 import { sdkRequest } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 const settingsSchema = z.looseObject({
   contents: z.record(z.string(), z.unknown()).optional(),
@@ -21,7 +22,7 @@ export const exa = {
         "https://mcp.exa.ai/mcp",
         {},
         "web_search_exa",
-        { query: queries[0], numResults: searchCount(globals) },
+        { query: queries[0], numResults: clamp(globals.searchResults, 1, 100) },
         signal,
       );
       if (result.structuredContent != null)
@@ -49,7 +50,7 @@ export const exa = {
       client.search(queries[0], {
         type: "auto",
         ...settings,
-        numResults: searchCount(globals),
+        numResults: clamp(globals.searchResults, 1, 100),
         contents: {
           highlights: { maxCharacters: 1000 },
           ...settings.contents,

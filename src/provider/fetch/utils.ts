@@ -1,12 +1,9 @@
 import { chunk, keyBy } from "es-toolkit/array";
+import { clamp } from "es-toolkit/math";
 import { isPlainObject as isRecord } from "es-toolkit/predicate";
 import { HTTPError, timedSignal } from "../../shared/http";
 import type { Globals } from "../../shared/config";
-import {
-  errorMessage,
-  mapConcurrent,
-  requestConcurrency,
-} from "../../shared/utils";
+import { mapConcurrent } from "../../shared/utils";
 import { stringValue } from "../../shared/config";
 import type { FetchFormat, FetchPage, FetchProvider } from "./types";
 import { firstList, responseMetadata } from "../utils";
@@ -15,11 +12,7 @@ export function providerResult(
   content: unknown,
   format: FetchFormat,
   metadata?: Record<string, unknown>,
-): {
-  content: string;
-  format: FetchFormat;
-  metadata?: Record<string, unknown>;
-} {
+) {
   if (typeof content !== "string" || !content.trim())
     throw new Error("provider returned empty content");
   return { content, format, ...(metadata ? { metadata } : {}) };
@@ -114,7 +107,7 @@ export async function fetchBatches(
         if (signal.aborted) throw error;
         return batch.map((url) => ({
           url,
-          error: errorMessage(error),
+          error: error instanceof Error ? error.message : String(error),
           ...(error instanceof HTTPError
             ? {
                 metadata: {
@@ -126,7 +119,7 @@ export async function fetchBatches(
         }));
       }
     },
-    requestConcurrency(globals),
+    clamp(globals.concurrency, 1, 16),
     signal,
   );
   return batches.flat();
@@ -230,10 +223,13 @@ export function fetchOne<S>(
               results[index] = { url, error: error.message };
               return;
             }
-            results[index] = { url, error: errorMessage(error) };
+            results[index] = {
+              url,
+              error: error instanceof Error ? error.message : String(error),
+            };
           }
         },
-        requestConcurrency(globals),
+        clamp(globals.concurrency, 1, 16),
         signal,
       );
     } catch (error) {

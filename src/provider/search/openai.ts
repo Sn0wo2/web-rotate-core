@@ -4,7 +4,8 @@ import { stringValue } from "../../shared/config";
 import { apiJSON } from "../../shared/http";
 import type { SearchProvider, SearchResponse, SearchResult } from "./types";
 import { requireKey } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 const settingsSchema = z.looseObject({
   model: z.string().optional(),
@@ -46,7 +47,7 @@ export const openai = {
           model: selectedModel,
           instructions:
             instructions?.trim() ||
-            `Search the web. Return at most ${searchCount(globals)} concise factual snippets, one per line with an inline citation. Do not write a long-form answer.`,
+            `Search the web. Return at most ${clamp(globals.searchResults, 1, 100)} concise factual snippets, one per line with an inline citation. Do not write a long-form answer.`,
           max_output_tokens: max_output_tokens ?? 2048,
           ...(reasoning
             ? { reasoning }

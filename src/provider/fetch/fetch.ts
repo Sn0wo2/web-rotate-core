@@ -1,19 +1,11 @@
+import { clamp } from "es-toolkit/math";
+import { orderBy } from "es-toolkit/array";
 import { omit } from "es-toolkit/object";
 import { HTTPError } from "../../shared/http";
 import { RotateConfigError, globalsSchema } from "../../shared/config";
-import type { Globals } from "../../shared/config";
-import {
-  errorMessage,
-  mapConcurrent,
-  requestConcurrency,
-} from "../../shared/utils";
+import { mapConcurrent } from "../../shared/utils";
 import type { URLList } from "../../shared/types";
-import {
-  providerRoutes,
-  resolveMaxAttempts,
-  resolveProviderEntries,
-  selectRoutes,
-} from "../rotation";
+import { providerRoutes, resolveProviderEntries } from "../rotation";
 import type { ProviderEntry } from "../types";
 import { FETCH_PROVIDERS } from "./index";
 import { fetchImage } from "./image";
@@ -77,7 +69,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
   config?: FetchProviderConfig<P> | undefined;
   implementations?: P | undefined;
 }): Promise<FetchOutcome> {
-  const globals: Globals = globalsSchema.parse(config);
+  const globals = globalsSchema.parse(config);
   const registry = new Map<string, FetchProvider>();
   for (const provider of [...FETCH_PROVIDERS, ...(implementations ?? [])])
     registry.set(provider.id, provider);
@@ -100,14 +92,19 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
   );
   if (image) return image;
 
-  const candidates = selectRoutes(
+  const candidates = orderBy(
     pool.filter((route) => format !== "html" || route.formats.includes("html")),
+    ["weight"],
+    ["desc"],
   );
   const pagesByURL = new Map<string, FetchPage>();
   const errorsByURL = new Map<string, string>();
   const blocked = new Set<string>();
   let pendingURLs = [...new Set(urls)];
-  const maxAttempts = resolveMaxAttempts(globals, candidates.length);
+  const maxAttempts = Math.max(
+    1,
+    Math.min(globals.maxAttempts, candidates.length),
+  );
   let attempts = 0;
   for (const route of candidates) {
     if (!pendingURLs.length || attempts >= maxAttempts) break;
@@ -160,11 +157,11 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
             if (signal.aborted) throw error;
             return {
               ...omit(page, ["content"]),
-              error: errorMessage(error),
+              error: error instanceof Error ? error.message : String(error),
             };
           }
         },
-        requestConcurrency(globals),
+        clamp(globals.concurrency, 1, 16),
         signal,
       );
       const routePagesByURL = new Map(
@@ -195,7 +192,11 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
       if (signal.aborted || error instanceof RotateConfigError) throw error;
       if (error instanceof HTTPError && error.invalidRequest)
         blocked.add(route.id);
-      for (const url of pendingURLs) errorsByURL.set(url, errorMessage(error));
+      for (const url of pendingURLs)
+        errorsByURL.set(
+          url,
+          error instanceof Error ? error.message : String(error),
+        );
     }
   }
   const pages = urls.map((url) => {

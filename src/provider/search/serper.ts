@@ -1,6 +1,7 @@
 import type { SearchProvider } from "./types";
 import { requireKey } from "../utils";
-import { restSearch, searchCount } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { restSearch } from "./utils";
 
 export const serper = {
   id: "serper",
@@ -10,7 +11,7 @@ export const serper = {
     ({ settings, queries, globals }) => ({
       ...settings,
       q: queries[0],
-      num: searchCount(globals),
+      num: clamp(globals.searchResults, 1, 100),
     }),
     (key) => ({ "X-API-Key": requireKey("serper", key) }),
   ),

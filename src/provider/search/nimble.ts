@@ -1,6 +1,6 @@
 import type { SearchProvider } from "./types";
-import { bearer } from "../utils";
-import { restSearch, searchCount } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { restSearch } from "./utils";
 
 export const nimble = {
   id: "nimble",
@@ -14,8 +14,8 @@ export const nimble = {
       full_content: false,
       ...settings,
       query: queries[0],
-      max_results: searchCount(globals),
+      max_results: clamp(globals.searchResults, 1, 100),
     }),
-    bearer,
+    (key) => ({ ...(key ? { Authorization: `Bearer ${key}` } : {}) }),
   ),
 } satisfies SearchProvider;

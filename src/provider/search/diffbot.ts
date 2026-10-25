@@ -1,7 +1,8 @@
 import { apiJSON } from "../../shared/http";
 import type { SearchProvider } from "./types";
 import { requireKey } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 export const diffbot = {
   id: "diffbot",
@@ -17,7 +18,7 @@ export const diffbot = {
           maxTokens: 2000,
           ...settings,
           text: queries,
-          size: searchCount(globals),
+          size: clamp(globals.searchResults, 1, 100),
         },
         headers: { Authorization: `Bearer ${requireKey("diffbot", key)}` },
       },

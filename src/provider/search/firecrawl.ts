@@ -3,7 +3,8 @@ import { z } from "zod";
 import type { SearchProvider } from "./types";
 import { apiJSON } from "../../shared/http";
 import { firstList } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 const settingsSchema = z.looseObject({ keyless: z.boolean().optional() });
 type FirecrawlSearchSettings = z.output<typeof settingsSchema>;
@@ -52,7 +53,7 @@ export const firecrawl = {
           ...(categories ? { categories } : {}),
           ...(includeDomains ? { includeDomains } : {}),
           ...(excludeDomains ? { excludeDomains } : {}),
-          limit: searchCount(globals),
+          limit: clamp(globals.searchResults, 1, 100),
           ...(tbs != null ? { tbs } : {}),
           ...(location != null ? { location } : {}),
           ...(country != null ? { country } : {}),

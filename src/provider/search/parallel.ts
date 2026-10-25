@@ -3,7 +3,8 @@ import { apiJSON } from "../../shared/http";
 import type { SearchProvider } from "./types";
 import { mcpJSON } from "../mcp";
 import { requireKey } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 const settingsSchema = z.looseObject({
   mode: z.string().optional(),
@@ -67,7 +68,7 @@ export const parallel = {
             max_chars_per_result: 1000,
             ...advanced_settings?.excerpt_settings,
           },
-          max_results: max_results ?? searchCount(globals, 20),
+          max_results: max_results ?? clamp(globals.searchResults, 1, 20),
         },
       },
     });

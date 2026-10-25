@@ -5,7 +5,8 @@ import { apiJSON } from "../../shared/http";
 import { stringValue } from "../../shared/config";
 import type { SearchProvider } from "./types";
 import { requireKey, urlParams } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 const settingsSchema = z.looseObject({ api: z.string().optional() });
 type BraveSearchSettings = z.output<typeof settingsSchema>;
@@ -24,7 +25,10 @@ export const brave = {
             new URL("https://api.search.brave.com/res/v1/web/search"),
             { extra_snippets: true, ...rest },
           );
-          endpoint.searchParams.set("count", String(searchCount(globals, 20)));
+          endpoint.searchParams.set(
+            "count",
+            String(clamp(globals.searchResults, 1, 20)),
+          );
           endpoint.searchParams.set("result_filter", "web");
           endpoint.searchParams.set("q", queries[0]);
           return endpoint.toString();
@@ -32,7 +36,7 @@ export const brave = {
         const endpoint = urlParams(
           new URL("https://api.search.brave.com/res/v1/llm/context"),
           {
-            maximum_number_of_urls: searchCount(globals, 50),
+            maximum_number_of_urls: clamp(globals.searchResults, 1, 50),
             maximum_number_of_tokens: 1024,
             maximum_number_of_tokens_per_url: 512,
             maximum_number_of_snippets: 16,
@@ -42,7 +46,10 @@ export const brave = {
             ...rest,
           },
         );
-        endpoint.searchParams.set("count", String(searchCount(globals, 50)));
+        endpoint.searchParams.set(
+          "count",
+          String(clamp(globals.searchResults, 1, 50)),
+        );
         endpoint.searchParams.set("q", queries[0]);
         return endpoint.toString();
       })(),

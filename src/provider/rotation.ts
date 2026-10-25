@@ -1,4 +1,4 @@
-import { compact, orderBy, uniq, zip } from "es-toolkit/array";
+import { compact, uniq, zip } from "es-toolkit/array";
 import { z } from "zod";
 import { RotateConfigError, stringList } from "../shared/config";
 import type { Globals } from "../shared/config";
@@ -75,14 +75,4 @@ export function providerRoutes<P extends Provider<unknown>>(
       }));
     });
   return compact(zip(...groups).flat());
-}
-
-export function selectRoutes<P extends Provider<unknown>>(
-  pool: readonly ProviderRoute<P>[],
-): ProviderRoute<P>[] {
-  return orderBy(pool, ["weight"], ["desc"]);
-}
-
-export function resolveMaxAttempts(globals: Globals, routes: number): number {
-  return Math.max(1, Math.min(globals.maxAttempts, routes));
 }

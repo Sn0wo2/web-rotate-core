@@ -3,7 +3,8 @@ import { z } from "zod";
 import { apiJSON } from "../../shared/http";
 import type { SearchProvider } from "./types";
 import { urlParams } from "../utils";
-import { searchCount, searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math";
+import { searchResponse } from "./utils";
 
 const settingsSchema = z.looseObject({
   headers: z.record(z.string(), z.string()).optional(),
@@ -18,7 +19,7 @@ export const jina = {
     if (!key) throw new Error("jina API key is not configured for search");
     const { headers, ...options } = settings;
     const endpoint = urlParams(new URL("https://s.jina.ai"), {
-      num: searchCount(globals, 20),
+      num: clamp(globals.searchResults, 1, 20),
       ...options,
       q: queries[0],
     });
