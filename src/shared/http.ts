@@ -1,6 +1,8 @@
+import pkg from "../../package.json" with { type: "json" };
+
 export const REQUEST_TIMEOUT_MS = 30_000;
 
-export const LIB_VERSION = "0.3.0";
+export const LIB_VERSION = pkg.version;
 export const USER_AGENT = `web-rotate-core/${LIB_VERSION}`;
 
 export const TARGET_USER_AGENT =
