@@ -33,6 +33,9 @@
       },
     },
   },
+  "overrides": {
+    "zod": "^4.6.7",
+  },
   "packages": {
     "@acemir/cssom": ["@acemir/cssom@0.9.32", "http://repo.nju.edu.cn/npm/@acemir/cssom/-/cssom-0.9.32.tgz", {}, "sha512-OijrAUu7rrJhSIoHNg6LMPS5e344nwUHA+1EFYYjrh64D+GmytUsfBQjci45TjT+rd5Spsp8B5xsZDT+TgyXXQ=="],
 
@@ -491,8 +494,6 @@
     "css-select/domutils": ["domutils@4.0.2", "http://repo.nju.edu.cn/npm/domutils/-/domutils-4.0.2.tgz", { "dependencies": { "dom-serializer": "^3.0.0", "domelementtype": "^3.0.0", "domhandler": "^6.0.0" } }, "sha512-qI4JLRKnSzqFqr7hAlS5xQDusBCjKSEG4t4+7aNrIQMHBcsC2TGEhuyABJdYkgSewL57PNLYEiibY2iPKhKpaA=="],
 
     "encoding-sniffer/iconv-lite": ["iconv-lite@0.6.3", "http://repo.nju.edu.cn/npm/iconv-lite/-/iconv-lite-0.6.3.tgz", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3.0.0" } }, "sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw=="],
-
-    "exa-js/zod": ["zod@3.25.76", "http://repo.nju.edu.cn/npm/zod/-/zod-3.25.76.tgz", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
 
     "express/content-type": ["content-type@2.1.0", "http://repo.nju.edu.cn/npm/content-type/-/content-type-2.1.0.tgz", {}, "sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag=="],
 
