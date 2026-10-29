@@ -1,7 +1,7 @@
-import { apiJSON } from "../../shared/http";
-import type { SearchProvider } from "./types";
-import { requireKey, urlParams } from "../utils";
-import { searchResponse } from "./utils";
+import { apiJSON } from "../../shared/http"
+import { requireKey, urlParams } from "../utils"
+import type { SearchProvider } from "./types"
+import { searchResponse } from "./utils"
 
 export const tinyfish = {
   id: "tinyfish",
@@ -11,12 +11,12 @@ export const tinyfish = {
       new URL("https://api.search.tinyfish.ai"),
       { domain_type: "web", ...settings },
       (_name, value) => (Array.isArray(value) ? value.join(",") : undefined),
-    );
-    endpoint.searchParams.set("query", queries[0]);
+    )
+    endpoint.searchParams.set("query", queries[0])
     return searchResponse(
       await apiJSON(endpoint.toString(), signal, {
         headers: { "X-API-Key": requireKey("tinyfish", key) },
       }),
-    );
+    )
   },
-} satisfies SearchProvider;
+} satisfies SearchProvider

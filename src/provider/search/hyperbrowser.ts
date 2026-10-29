@@ -1,8 +1,8 @@
-import get from "es-toolkit/compat/get";
-import { Hyperbrowser } from "@hyperbrowser/sdk";
-import type { SearchProvider } from "./types";
-import { requireKey, sdkRequest } from "../utils";
-import { searchResponse } from "./utils";
+import { Hyperbrowser } from "@hyperbrowser/sdk"
+import get from "es-toolkit/compat/get"
+import { requireKey, sdkRequest } from "../utils"
+import type { SearchProvider } from "./types"
+import { searchResponse } from "./utils"
 
 export const hyperbrowser = {
   id: "hyperbrowser",
@@ -11,7 +11,7 @@ export const hyperbrowser = {
     const client = new Hyperbrowser({
       apiKey: requireKey("hyperbrowser", key),
       baseUrl: "https://api.hyperbrowser.ai",
-    });
+    })
     const payload = await sdkRequest(signal, () =>
       client.web.search({
         page: 1,
@@ -19,7 +19,7 @@ export const hyperbrowser = {
         maxAgeSeconds: globals.cacheWindowSeconds,
         query: queries[0],
       }),
-    );
-    return searchResponse(payload, get(payload, "data.results"));
+    )
+    return searchResponse(payload, get(payload, "data.results"))
   },
-} satisfies SearchProvider;
+} satisfies SearchProvider

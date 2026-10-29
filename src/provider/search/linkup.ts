@@ -1,8 +1,8 @@
-import { apiJSON } from "../../shared/http";
-import type { SearchProvider } from "./types";
-import { requireKey } from "../utils";
-import { clamp } from "es-toolkit/math";
-import { searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math"
+import { apiJSON } from "../../shared/http"
+import { requireKey } from "../utils"
+import type { SearchProvider } from "./types"
+import { searchResponse } from "./utils"
 
 export const linkup = {
   id: "linkup",
@@ -23,7 +23,7 @@ export const linkup = {
       depth: "standard",
       ...settings,
       maxResults: clamp(globals.searchResults, 1, 100),
-    };
+    }
     const payload = await apiJSON("https://api.linkup.so/v1/search", signal, {
       key: requireKey("linkup", key),
       body: {
@@ -34,25 +34,17 @@ export const linkup = {
         ...(excludeDomains ? { excludeDomains } : {}),
         ...(fromDate !== undefined
           ? {
-              fromDate:
-                fromDate instanceof Date
-                  ? fromDate.toISOString().slice(0, 10)
-                  : fromDate,
+              fromDate: fromDate instanceof Date ? fromDate.toISOString().slice(0, 10) : fromDate,
             }
           : {}),
         ...(toDate !== undefined
           ? {
-              toDate:
-                toDate instanceof Date
-                  ? toDate.toISOString().slice(0, 10)
-                  : toDate,
+              toDate: toDate instanceof Date ? toDate.toISOString().slice(0, 10) : toDate,
             }
           : {}),
         ...(maxResults !== undefined ? { maxResults } : {}),
         ...(includeImages !== undefined ? { includeImages } : {}),
-        ...(includeInlineCitations !== undefined
-          ? { includeInlineCitations }
-          : {}),
+        ...(includeInlineCitations !== undefined ? { includeInlineCitations } : {}),
         ...(includeSources !== undefined ? { includeSources } : {}),
         ...(structuredOutputSchema !== undefined
           ? {
@@ -63,7 +55,7 @@ export const linkup = {
             }
           : {}),
       },
-    });
-    return searchResponse(payload);
+    })
+    return searchResponse(payload)
   },
-} satisfies SearchProvider;
+} satisfies SearchProvider

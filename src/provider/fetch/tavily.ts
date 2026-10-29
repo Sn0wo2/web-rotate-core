@@ -1,9 +1,9 @@
-import { isPlainObject as isRecord } from "es-toolkit/predicate";
-import { stringValue } from "../../shared/config";
-import { apiJSON, REQUEST_TIMEOUT_MS } from "../../shared/http";
-import type { FetchProvider } from "./types";
-import { mcpJSON, MCP_FETCH_TIMEOUT_MS } from "../mcp";
-import { fetchBatches, fetchPages } from "./utils";
+import { isPlainObject as isRecord } from "es-toolkit/predicate"
+import { stringValue } from "../../shared/config"
+import { apiJSON, REQUEST_TIMEOUT_MS } from "../../shared/http"
+import { MCP_FETCH_TIMEOUT_MS, mcpJSON } from "../mcp"
+import type { FetchProvider } from "./types"
+import { fetchBatches, fetchPages } from "./utils"
 
 export const tavily = {
   id: "tavily",
@@ -12,7 +12,7 @@ export const tavily = {
   formats: ["text", "markdown"],
   run: async ({ settings, key, urls, signal, format, globals }) => {
     if (key && !Object.keys(settings).length) {
-      return fetchBatches(urls, 20, globals, signal, async (batch) => {
+      return await fetchBatches(urls, 20, globals, signal, async (batch) => {
         const payload = await mcpJSON(
           `https://mcp.tavily.com/mcp/?tavilyApiKey=${key}`,
           {},
@@ -20,17 +20,12 @@ export const tavily = {
           { urls: batch, extract_depth: "advanced", format },
           signal,
           MCP_FETCH_TIMEOUT_MS,
-        );
-        return fetchPages(
-          batch,
-          payload,
-          (item) => stringValue(item.raw_content) ?? stringValue(item.content),
-          format,
-        );
-      });
+        )
+        return fetchPages(batch, payload, (item) => stringValue(item.raw_content) ?? stringValue(item.content), format)
+      })
     }
-    return fetchBatches(urls, 20, globals, signal, async (batch) => {
-      const { timeout, sessionId, humanId, clientName, ...options } = settings;
+    return await fetchBatches(urls, 20, globals, signal, async (batch) => {
+      const { timeout, sessionId, humanId, clientName, ...options } = settings
       const requestOptions = Object.fromEntries(
         Object.entries(options).map(([name, value]) => [
           (
@@ -44,7 +39,7 @@ export const tavily = {
           )[name] ?? name,
           value,
         ]),
-      );
+      )
       const response = await apiJSON("https://api.tavily.com/extract", signal, {
         key,
         body: {
@@ -69,30 +64,34 @@ export const tavily = {
           typeof timeout === "number" && timeout > 0
             ? Math.min(REQUEST_TIMEOUT_MS, timeout * 1000)
             : REQUEST_TIMEOUT_MS,
-      });
-      const payload = isRecord(response) ? response : {};
+      })
+      const payload = isRecord(response) ? response : {}
       return fetchPages(
         batch,
         {
           results: Array.isArray(payload.results)
-            ? payload.results.filter(isRecord).map((item) => ({
-                url: item.url,
-                title: item.title,
-                rawContent: item.raw_content,
-                images: item.images,
-                favicon: item.favicon,
-              }))
+            ? payload.results.filter(isRecord).map((item) => {
+                return {
+                  url: item.url,
+                  title: item.title,
+                  rawContent: item.raw_content,
+                  images: item.images,
+                  favicon: item.favicon,
+                }
+              })
             : [],
           failed_results: Array.isArray(payload.failed_results)
-            ? payload.failed_results.filter(isRecord).map((item) => ({
-                url: item.url,
-                error: item.error,
-              }))
+            ? payload.failed_results.filter(isRecord).map((item) => {
+                return {
+                  url: item.url,
+                  error: item.error,
+                }
+              })
             : [],
         },
         (item) => stringValue(item.rawContent),
         format,
-      );
-    });
+      )
+    })
   },
-} satisfies FetchProvider;
+} satisfies FetchProvider

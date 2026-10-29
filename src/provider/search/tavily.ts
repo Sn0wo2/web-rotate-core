@@ -1,8 +1,8 @@
-import { apiJSON, REQUEST_TIMEOUT_MS } from "../../shared/http";
-import type { SearchProvider } from "./types";
-import { mcpJSON } from "../mcp";
-import { clamp } from "es-toolkit/math";
-import { searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math"
+import { apiJSON, REQUEST_TIMEOUT_MS } from "../../shared/http"
+import { mcpJSON } from "../mcp"
+import type { SearchProvider } from "./types"
+import { searchResponse } from "./utils"
 
 export const tavily = {
   id: "tavily",
@@ -20,18 +20,10 @@ export const tavily = {
           max_results: clamp(globals.searchResults, 1, 20),
         },
         signal,
-      );
-      return searchResponse(payload);
+      )
+      return searchResponse(payload)
     }
-    const {
-      timeout,
-      sessionId,
-      humanId,
-      clientName,
-      maxAgeHours,
-      maxHours,
-      ...options
-    } = settings;
+    const { timeout, sessionId, humanId, clientName, maxAgeHours, maxHours, ...options } = settings
     const requestOptions = Object.fromEntries(
       Object.entries(options).map(([name, value]) => [
         (
@@ -60,9 +52,8 @@ export const tavily = {
         )[name] ?? name,
         value,
       ]),
-    );
-    const resolvedClientName =
-      clientName === undefined ? "web-rotate-core" : clientName;
+    )
+    const resolvedClientName = clientName === undefined ? "web-rotate-core" : clientName
     const payload = await apiJSON("https://api.tavily.com/search", signal, {
       key,
       body: {
@@ -88,17 +79,13 @@ export const tavily = {
               "X-Tavily-Access-Mode": "keyless",
               "X-Client-Source": "tavily-js-keyless",
             }),
-        ...(resolvedClientName
-          ? { "X-Client-Name": String(resolvedClientName) }
-          : {}),
+        ...(resolvedClientName ? { "X-Client-Name": String(resolvedClientName) } : {}),
         ...(sessionId ? { "X-Session-Id": String(sessionId) } : {}),
         ...(humanId ? { "X-Human-Id": String(humanId) } : {}),
       },
       timeoutMs:
-        typeof timeout === "number" && timeout > 0
-          ? Math.min(REQUEST_TIMEOUT_MS, timeout * 1000)
-          : REQUEST_TIMEOUT_MS,
-    });
-    return searchResponse(payload);
+        typeof timeout === "number" && timeout > 0 ? Math.min(REQUEST_TIMEOUT_MS, timeout * 1000) : REQUEST_TIMEOUT_MS,
+    })
+    return searchResponse(payload)
   },
-} satisfies SearchProvider;
+} satisfies SearchProvider

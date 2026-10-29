@@ -1,46 +1,41 @@
-import get from "es-toolkit/compat/get";
-import { Hyperbrowser } from "@hyperbrowser/sdk";
-import { z } from "zod";
-import { stringValue } from "../../shared/config";
-import type { FetchProvider } from "./types";
-import { requireKey, sdkRequest } from "../utils";
-import { fetchOne, providerResult } from "./utils";
+import { Hyperbrowser } from "@hyperbrowser/sdk"
+import get from "es-toolkit/compat/get"
+import { z } from "zod"
+import { stringValue } from "../../shared/config"
+import { requireKey, sdkRequest } from "../utils"
+import type { FetchProvider } from "./types"
+import { fetchOne, providerResult } from "./utils"
 
 const settingsSchema = z.looseObject({
   cache: z.looseObject({ maxAgeSeconds: z.number().optional() }).optional(),
   outputs: z.record(z.string(), z.unknown()).optional(),
-});
-type HyperbrowserFetchSettings = z.output<typeof settingsSchema>;
+})
+type HyperbrowserFetchSettings = z.output<typeof settingsSchema>
 
 export const hyperbrowser = {
   id: "hyperbrowser",
   weight: 56,
   formats: ["html", "markdown"],
   options: settingsSchema,
-  run: fetchOne<HyperbrowserFetchSettings>(
-    async ({ settings, key, url, signal, format, globals }) => {
-      const client = new Hyperbrowser({
-        apiKey: requireKey("hyperbrowser", key),
-        baseUrl: "https://api.hyperbrowser.ai",
-      });
-      const payload = await sdkRequest(signal, () =>
-        client.web.fetch({
-          ...settings,
-          url,
-          cache: {
-            ...settings.cache,
-            maxAgeSeconds: globals.cacheWindowSeconds,
-          },
-          outputs: {
-            ...settings.outputs,
-            formats: [format as "html" | "markdown"],
-          },
-        }),
-      );
-      return providerResult(
-        stringValue(get(payload, ["data", format])),
-        format,
-      );
-    },
-  ),
-} satisfies FetchProvider<HyperbrowserFetchSettings>;
+  run: fetchOne<HyperbrowserFetchSettings>(async ({ settings, key, url, signal, format, globals }) => {
+    const client = new Hyperbrowser({
+      apiKey: requireKey("hyperbrowser", key),
+      baseUrl: "https://api.hyperbrowser.ai",
+    })
+    const payload = await sdkRequest(signal, () =>
+      client.web.fetch({
+        ...settings,
+        url,
+        cache: {
+          ...settings.cache,
+          maxAgeSeconds: globals.cacheWindowSeconds,
+        },
+        outputs: {
+          ...settings.outputs,
+          formats: [format as "html" | "markdown"],
+        },
+      }),
+    )
+    return providerResult(stringValue(get(payload, ["data", format])), format)
+  }),
+} satisfies FetchProvider<HyperbrowserFetchSettings>

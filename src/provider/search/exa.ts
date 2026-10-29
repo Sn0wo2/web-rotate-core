@@ -1,15 +1,20 @@
-import Exa from "exa-js";
-import { z } from "zod";
-import type { SearchProvider } from "./types";
-import { mcpCall } from "../mcp";
-import { sdkRequest } from "../utils";
-import { clamp } from "es-toolkit/math";
-import { searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math"
+import Exa from "exa-js"
+import { z } from "zod"
+import { mcpCall } from "../mcp"
+import { sdkRequest } from "../utils"
+import type { SearchProvider } from "./types"
+import { searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({
   contents: z.record(z.string(), z.unknown()).optional(),
-});
-type ExaSearchSettings = z.output<typeof settingsSchema>;
+})
+type ExaSearchSettings = z.output<typeof settingsSchema>
+const MCP_RESULT_SEPARATOR = /\n\n---\n\n/
+const URL_LINE = /^URL:\s*(.+)$/m
+const TITLE_LINE = /^Title:\s*(.+)$/m
+const CONTENT_LINE = /^(?:Highlights|Text):\s*([\s\S]*)$/m
+const PUBLISHED_LINE = /^Published:\s*(.+)$/m
 
 export const exa = {
   id: "exa",
@@ -24,28 +29,23 @@ export const exa = {
         "web_search_exa",
         { query: queries[0], numResults: clamp(globals.searchResults, 1, 100) },
         signal,
-      );
-      if (result.structuredContent != null)
-        return searchResponse(result.structuredContent);
-      const text = result.content.find((part) => part.type === "text")?.text;
-      const blocks: Record<string, unknown>[] = [];
-      for (const block of text?.split(/\n\n---\n\n/) ?? []) {
-        const url = block.match(/^URL:\s*(.+)$/m)?.[1]?.trim();
+      )
+      if (result.structuredContent != null) return searchResponse(result.structuredContent)
+      const text = result.content.find((part) => part.type === "text")?.text
+      const blocks: Record<string, unknown>[] = []
+      for (const block of text?.split(MCP_RESULT_SEPARATOR) ?? []) {
+        const url = block.match(URL_LINE)?.[1]?.trim()
         if (url)
           blocks.push({
             url,
-            title: block.match(/^Title:\s*(.+)$/m)?.[1]?.trim(),
-            content: block
-              .match(/^(?:Highlights|Text):\s*([\s\S]*)$/m)?.[1]
-              ?.trim(),
-            publish_date: block.match(/^Published:\s*(.+)$/m)?.[1]?.trim(),
-          });
+            title: block.match(TITLE_LINE)?.[1]?.trim(),
+            content: block.match(CONTENT_LINE)?.[1]?.trim(),
+            publish_date: block.match(PUBLISHED_LINE)?.[1]?.trim(),
+          })
       }
-      return blocks.length
-        ? searchResponse(blocks)
-        : { results: [], ...(text ? { metadata: { text } } : {}) };
+      return blocks.length ? searchResponse(blocks) : { results: [], ...(text ? { metadata: { text } } : {}) }
     }
-    const client = new Exa(key);
+    const client = new Exa(key)
     const payload = await sdkRequest(signal, () =>
       client.search(queries[0], {
         type: "auto",
@@ -57,7 +57,7 @@ export const exa = {
           maxAgeHours: Math.floor(globals.cacheWindowSeconds / 3600),
         },
       }),
-    );
-    return searchResponse(payload);
+    )
+    return searchResponse(payload)
   },
-} satisfies SearchProvider<ExaSearchSettings>;
+} satisfies SearchProvider<ExaSearchSettings>

@@ -1,1 +1,1 @@
-export type URLList = [string, ...string[]];
+export type URLList = [string, ...string[]]

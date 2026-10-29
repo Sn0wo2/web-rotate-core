@@ -3,6 +3,7 @@
   "version": "0.4.0",
   "description": "One Gateway for All WebSearch/WebFetch Providers!",
   "type": "module",
+  "packageManager": "bun@1.4.4",
   "files": [
     "src"
   ],
@@ -15,8 +16,10 @@
   "scripts": {
     "benchmark": "bun run benchmark/run.ts",
     "check": "tsc --noEmit",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "lint": "biome check --error-on-warnings .",
+    "lint:fix": "biome check --write --error-on-warnings .",
+    "security": "bun audit --registry=https://registry.npmjs.org",
+    "ci": "bun run lint && bun run check && bun run security"
   },
   "dependencies": {
     "@hyperbrowser/sdk": "^1.4.0",
@@ -42,7 +45,7 @@
   "devDependencies": {
     "@types/bun": "^1.4.4",
     "@types/html-to-text": "^9.0.4",
-    "prettier": "^3.9.10",
+    "@biomejs/biome": "^2.6.4",
     "typescript": "^7.0.2"
   }
 }

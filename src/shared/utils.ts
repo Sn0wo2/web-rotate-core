@@ -1,4 +1,4 @@
-import pMap from "p-map";
+import pMap from "p-map"
 
 export function mapConcurrent<T, R>(
   items: readonly T[],
@@ -9,5 +9,5 @@ export function mapConcurrent<T, R>(
   return pMap(items, run, {
     concurrency: Math.max(1, Math.floor(concurrency)),
     signal,
-  });
+  })
 }

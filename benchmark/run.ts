@@ -1,16 +1,20 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fetchWeb, FETCH_PROVIDERS, RotateConfigError } from "../src/index";
-import type {
-  FetchProvider,
-  FetchProviderConfig,
-  ProviderEntry,
-} from "../src/index";
-import { mapConcurrent } from "../src/shared/utils";
+import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { dirname, join } from "node:path"
+import type { FetchProvider, FetchProviderConfig, ProviderEntry } from "../src/index"
+import { FETCH_PROVIDERS, fetchWeb, RotateConfigError } from "../src/index"
+import { mapConcurrent } from "../src/shared/utils"
 
-const DEFAULT_MODEL = "jev-1.13";
-const FETCH_CONCURRENCY = 2;
-const JUDGE_CONCURRENCY = 2;
+const DEFAULT_MODEL = "jev-1.13"
+const FETCH_CONCURRENCY = 2
+const JUDGE_CONCURRENCY = 2
+const URL_LIST_SEPARATOR = /[\s,;]+/
+const VERSIONED_API_ENDPOINT = /\/v\d+$/
+const TRAILING_SLASHES = /\/+$/
+const MAX_TOKENS_EXCEEDED = /max_tokens_exceeded/i
+const URL_FILE_LINES = /\r?\n/
+const URL_SCHEME = /^https?:\/\//i
+const SLUG_CHARACTERS = /[^a-zA-Z0-9]+/g
+const SLUG_EDGE_DASHES = /^-+|-+$/g
 
 const JUDGE_INSTRUCTIONS = `Evaluate the unnamed candidate's web page text extraction for the given URL. Use the provided native local extraction of the same page as a completeness reference, not as a candidate to score. Judge the quality of the extracted main content, considering coverage, structure, and cleanliness
 
@@ -25,7 +29,7 @@ Penalize ads, navigation menus, cookie banners, scripts, duplicates, unrelated c
 
 Texts are whitespace-compacted, and entries marked truncated were shortened only for display. Do not penalize these presentation artifacts or infer extraction failures from them
 
-Return only an integer from 0 to 9`;
+Return only an integer from 0 to 9`
 
 const SCORE_LEVELS = [
   "0 - invalid: empty, mojibake, or placeholder text",
@@ -38,7 +42,7 @@ const SCORE_LEVELS = [
   "7 - good: essentially complete content with minor noise or omissions",
   "8 - excellent: complete content with negligible noise",
   "9 - perfect: complete main content, zero noise, clean structure",
-];
+]
 
 const USAGE = `web-rotate-core benchmark
 
@@ -57,30 +61,22 @@ notes:
   --env K=V sets config values (e.g. cleanup=defuddle, concurrency=1,
   maxAttempts=3).
   judge env: TYPESAFE_API_KEY and TYPESAFE_BASE_URL (both required),
-  TYPESAFE_MODEL`;
+  TYPESAFE_MODEL`
 
 type Parsed = {
-  _: string[];
-  env: string[];
-  providers: string[];
-  urls: string | undefined;
-  reads: number;
-  retries: number;
-  saveDir: string;
-  timeout: number;
-  json: boolean;
-};
+  _: string[]
+  env: string[]
+  providers: string[]
+  urls: string | undefined
+  reads: number
+  retries: number
+  saveDir: string
+  timeout: number
+  json: boolean
+}
 
 function parseArgv(argv: string[]): Parsed {
-  const valueFlags = new Set([
-    "providers",
-    "env",
-    "urls",
-    "reads",
-    "retries",
-    "save-dir",
-    "timeout",
-  ]);
+  const valueFlags = new Set(["providers", "env", "urls", "reads", "retries", "save-dir", "timeout"])
   const parsed: Parsed = {
     _: [],
     env: [],
@@ -91,132 +87,118 @@ function parseArgv(argv: string[]): Parsed {
     saveDir: "benchmark/out",
     timeout: 1200,
     json: false,
-  };
-  for (let index = 0; index < argv.length; index++) {
-    const token = argv[index]!;
-    if (!token.startsWith("--")) {
-      parsed._.push(token);
-      continue;
-    }
-    const name = token.slice(2);
-    if (name === "json") {
-      parsed.json = true;
-      continue;
-    }
-    if (!valueFlags.has(name)) throw new Error(`unknown option --${name}`);
-    const value = argv[++index];
-    if (value === undefined) throw new Error(`--${name} requires a value`);
-    if (name === "env") parsed.env.push(value);
-    else if (name === "providers")
-      parsed.providers.push(...value.split(/[\s,;]+/).filter(Boolean));
-    else if (name === "urls") parsed.urls = value;
-    else if (name === "reads") parsed.reads = positive(value, name);
-    else if (name === "retries") parsed.retries = positive(value, name);
-    else if (name === "save-dir") parsed.saveDir = value;
-    else if (name === "timeout") parsed.timeout = positive(value, name);
   }
-  return parsed;
+  for (let index = 0; index < argv.length; index++) {
+    const token = argv[index]
+    if (token === undefined) continue
+    if (!token.startsWith("--")) {
+      parsed._.push(token)
+      continue
+    }
+    const name = token.slice(2)
+    if (name === "json") {
+      parsed.json = true
+      continue
+    }
+    if (!valueFlags.has(name)) throw new Error(`unknown option --${name}`)
+    const value = argv[++index]
+    if (value === undefined) throw new Error(`--${name} requires a value`)
+    if (name === "env") parsed.env.push(value)
+    else if (name === "providers") parsed.providers.push(...value.split(URL_LIST_SEPARATOR).filter(Boolean))
+    else if (name === "urls") parsed.urls = value
+    else if (name === "reads") parsed.reads = positive(value, name)
+    else if (name === "retries") parsed.retries = positive(value, name)
+    else if (name === "save-dir") parsed.saveDir = value
+    else if (name === "timeout") parsed.timeout = positive(value, name)
+  }
+  return parsed
 }
 
 function positive(value: string, name: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0)
-    throw new Error(`--${name} must be a positive number`);
-  return parsed;
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`--${name} must be a positive number`)
+  return parsed
 }
 
 type EnvContext = {
-  getOption(name: string): string | undefined;
-};
+  getOption(name: string): string | undefined
+}
 
 function envMap(parsed: Parsed): Map<string, string> {
   return new Map(
     parsed.env.map((entry) => {
-      const eq = entry.indexOf("=");
+      const eq = entry.indexOf("=")
       return eq > 0
         ? ([entry.slice(0, eq), entry.slice(eq + 1)] as [string, string])
-        : ([entry, ""] as [string, string]);
+        : ([entry, ""] as [string, string])
     }),
-  );
+  )
 }
 
 function buildContext(parsed: Parsed): EnvContext {
-  const env = envMap(parsed);
+  const env = envMap(parsed)
   return {
     getOption: (name) => env.get(name) ?? process.env[name.toUpperCase()],
-  };
+  }
 }
 
-function providerKeys(
-  env: Map<string, string>,
-  id: string,
-): string[] | undefined {
-  const raw =
-    env.get(`${id}Keys`) ?? process.env[`${id.toUpperCase()}_API_KEY`];
-  return raw ? raw.split(/[\s,;]+/).filter(Boolean) : undefined;
+function providerKeys(env: Map<string, string>, id: string): string[] | undefined {
+  const raw = env.get(`${id}Keys`) ?? process.env[`${id.toUpperCase()}_API_KEY`]
+  return raw ? raw.split(URL_LIST_SEPARATOR).filter(Boolean) : undefined
 }
 
 function buildFetchConfig(
   parsed: Parsed,
   options?: { cleanup?: "none" | "defuddle"; only?: string },
 ): FetchProviderConfig {
-  const env = envMap(parsed);
-  const config: FetchProviderConfig = { prefer: "keyless" };
-  const cleanup = options?.cleanup ?? env.get("cleanup");
-  if (cleanup === "none" || cleanup === "defuddle") config.cleanup = cleanup;
-  const concurrency = Number(env.get("concurrency"));
-  if (Number.isFinite(concurrency) && concurrency > 0)
-    config.concurrency = concurrency;
-  const maxAttempts = Number(env.get("maxAttempts"));
-  if (Number.isFinite(maxAttempts) && maxAttempts > 0)
-    config.maxAttempts = maxAttempts;
-  const slots: Record<string, ProviderEntry> = {};
+  const env = envMap(parsed)
+  const config: FetchProviderConfig = { prefer: "keyless" }
+  const cleanup = options?.cleanup ?? env.get("cleanup")
+  if (cleanup === "none" || cleanup === "defuddle") config.cleanup = cleanup
+  const concurrency = Number(env.get("concurrency"))
+  if (Number.isFinite(concurrency) && concurrency > 0) config.concurrency = concurrency
+  const maxAttempts = Number(env.get("maxAttempts"))
+  if (Number.isFinite(maxAttempts) && maxAttempts > 0) config.maxAttempts = maxAttempts
+  const slots: Record<string, ProviderEntry> = {}
   for (const provider of FETCH_PROVIDERS) {
-    if (options?.only && provider.id !== options.only) continue;
-    const keys = providerKeys(env, provider.id);
-    slots[provider.id] = keys?.length ? { keys } : {};
+    if (options?.only && provider.id !== options.only) continue
+    const keys = providerKeys(env, provider.id)
+    slots[provider.id] = keys?.length ? { keys } : {}
   }
-  config.providers = slots as NonNullable<FetchProviderConfig["providers"]>;
-  return config;
+  config.providers = slots as NonNullable<FetchProviderConfig["providers"]>
+  return config
 }
 
-function selectProviders(
-  parsed: Parsed,
-  filter?: string[],
-): { provider: FetchProvider; skip?: string }[] {
-  const env = envMap(parsed);
+function selectProviders(parsed: Parsed, filter?: string[]): { provider: FetchProvider; skip?: string }[] {
+  const env = envMap(parsed)
   if (filter?.length) {
     return filter.map((id) => {
-      const provider = FETCH_PROVIDERS.find((entry) => entry.id === id);
+      const provider = FETCH_PROVIDERS.find((entry) => entry.id === id)
       if (!provider)
         throw new Error(
-          `provider ${id} has no fetch capability (available: ${FETCH_PROVIDERS.map(
-            (entry) => entry.id,
-          ).join(", ")})`,
-        );
-      return { provider };
-    });
+          `provider ${id} has no fetch capability (available: ${FETCH_PROVIDERS.map((entry) => entry.id).join(", ")})`,
+        )
+      return { provider }
+    })
   }
-  return FETCH_PROVIDERS.filter((provider) => provider.id !== "native").map(
-    (provider) => {
-      if ("keyless" in provider && provider.keyless) return { provider };
-      return providerKeys(env, provider.id)?.length
-        ? { provider }
-        : {
-            provider,
-            skip: `missing key (${provider.id.toUpperCase()}_API_KEY)`,
-          };
-    },
-  );
+  return FETCH_PROVIDERS.filter((provider) => provider.id !== "native").map((provider) => {
+    if ("keyless" in provider && provider.keyless) return { provider }
+    return providerKeys(env, provider.id)?.length
+      ? { provider }
+      : {
+          provider,
+          skip: `missing key (${provider.id.toUpperCase()}_API_KEY)`,
+        }
+  })
 }
 
 type Row = {
-  provider: string;
-  url: string;
-  content: string | undefined;
-  format: string | undefined;
-  error: string | undefined;
-};
+  provider: string
+  url: string
+  content: string | undefined
+  format: string | undefined
+  error: string | undefined
+}
 
 async function fetchProvider(
   urls: readonly string[],
@@ -224,28 +206,27 @@ async function fetchProvider(
   provider: FetchProvider | undefined,
   signal: AbortSignal,
 ): Promise<Row[]> {
-  const id = provider?.id ?? "native";
+  const id = provider?.id ?? "native"
   const config = provider
     ? buildFetchConfig(parsed, { only: provider.id })
-    : buildFetchConfig(parsed, { only: "native", cleanup: "defuddle" });
-  const failed = (url: string, error: string): Row => ({
-    provider: id,
-    url,
-    content: undefined,
-    format: undefined,
-    error,
-  });
+    : buildFetchConfig(parsed, { only: "native", cleanup: "defuddle" })
+  const failed = (url: string, error: string): Row => {
+    return {
+      provider: id,
+      url,
+      content: undefined,
+      format: undefined,
+      error,
+    }
+  }
   try {
     const outcome = await fetchWeb({
       config,
       urls: [...urls] as [string, ...string[]],
       format: "markdown",
       signal,
-    });
-    if (outcome.type !== "pages")
-      return urls.map((url) =>
-        failed(url, "image outcome is not benchmarkable"),
-      );
+    })
+    if (outcome.type !== "pages") return urls.map((url) => failed(url, "image outcome is not benchmarkable"))
     return outcome.pages.map((page) =>
       page.provider === id && page.content
         ? {
@@ -255,32 +236,28 @@ async function fetchProvider(
             format: page.format,
             error: undefined,
           }
-        : failed(
-            page.url,
-            page.error ?? "unattributed result (native fallback)",
-          ),
-    );
+        : failed(page.url, page.error ?? "unattributed result (native fallback)"),
+    )
   } catch (error) {
-    if (signal.aborted) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    return urls.map((url) => failed(url, message));
+    if (signal.aborted) throw error
+    const message = error instanceof Error ? error.message : String(error)
+    return urls.map((url) => failed(url, message))
   }
 }
 
 type Candidate = {
-  provider: string;
-  format: string;
-  size: number;
-  content: string;
-};
+  provider: string
+  format: string
+  size: number
+  content: string
+}
 
-const TOKEN_BUDGET = 32_000;
+const TOKEN_BUDGET = 32_000
 
 const tokenEstimate = (text: string) => {
-  const cjk = (text.match(/[\u3000-\u9fff\u3040-\u30ff\uac00-\ud7af]/gu) ?? [])
-    .length;
-  return cjk + (text.length - cjk) * 0.3;
-};
+  const cjk = (text.match(/[\u3000-\u9fff\u3040-\u30ff\uac00-\ud7af]/gu) ?? []).length
+  return cjk + (text.length - cjk) * 0.3
+}
 
 const judgeView = (text: string) =>
   text
@@ -288,50 +265,37 @@ const judgeView = (text: string) =>
     .replace(/\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/g, "$1")
     .replace(/https?:\/\/\S+/g, "")
     .replace(/ {2,}/g, " ")
-    .trim();
+    .trim()
 
-const fitContent = (
-  text: string,
-  tokenBudget: number,
-): { content: string; truncated: boolean } => {
-  const estimate = tokenEstimate(text);
-  if (estimate <= tokenBudget) return { content: text, truncated: false };
-  const cap = Math.max(0, Math.floor((text.length * tokenBudget) / estimate));
-  const head = Math.floor(cap * 0.7);
+const fitContent = (text: string, tokenBudget: number): { content: string; truncated: boolean } => {
+  const estimate = tokenEstimate(text)
+  if (estimate <= tokenBudget) return { content: text, truncated: false }
+  const cap = Math.max(0, Math.floor((text.length * tokenBudget) / estimate))
+  const head = Math.floor(cap * 0.7)
   return {
     content: `${text.slice(0, head)} [...truncated to fit the judge window...] ${cap > head ? text.slice(-cap + head) : ""}`,
     truncated: true,
-  };
-};
-
-type JudgeConfig = { endpoint: string; apiKey: string; model: string };
-type ScoreAnswer = { score?: number; confidence?: number };
-type Usage = { input_tokens?: number; output_tokens?: number };
-
-function judgeConfig(ctx: EnvContext): JudgeConfig {
-  const rawBase =
-    ctx.getOption("TYPESAFE_BASE_URL") || process.env.TYPESAFE_BASE_URL;
-  if (!rawBase)
-    throw new RotateConfigError("TYPESAFE_BASE_URL is not configured");
-  const base = rawBase.replace(/\/+$/, "");
-  const apiKey =
-    ctx.getOption("TYPESAFE_API_KEY") || process.env.TYPESAFE_API_KEY;
-  if (!apiKey)
-    throw new RotateConfigError("TYPESAFE_API_KEY is not configured");
-  return {
-    endpoint: /\/v\d+$/.test(base)
-      ? `${base}/systemone`
-      : `${base}/v1/systemone`,
-    apiKey,
-    model:
-      ctx.getOption("TYPESAFE_MODEL") ||
-      process.env.TYPESAFE_MODEL ||
-      DEFAULT_MODEL,
-  };
+  }
 }
 
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
+type JudgeConfig = { endpoint: string; apiKey: string; model: string }
+type ScoreAnswer = { score?: number; confidence?: number }
+type Usage = { input_tokens?: number; output_tokens?: number }
+
+function judgeConfig(ctx: EnvContext): JudgeConfig {
+  const rawBase = ctx.getOption("TYPESAFE_BASE_URL") || process.env.TYPESAFE_BASE_URL
+  if (!rawBase) throw new RotateConfigError("TYPESAFE_BASE_URL is not configured")
+  const base = rawBase.replace(TRAILING_SLASHES, "")
+  const apiKey = ctx.getOption("TYPESAFE_API_KEY") || process.env.TYPESAFE_API_KEY
+  if (!apiKey) throw new RotateConfigError("TYPESAFE_API_KEY is not configured")
+  return {
+    endpoint: VERSIONED_API_ENDPOINT.test(base) ? `${base}/systemone` : `${base}/v1/systemone`,
+    apiKey,
+    model: ctx.getOption("TYPESAFE_MODEL") || process.env.TYPESAFE_MODEL || DEFAULT_MODEL,
+  }
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 async function judgeRead(
   cfg: JudgeConfig,
@@ -340,12 +304,12 @@ async function judgeRead(
   retries: number,
   timeoutMs: number,
 ): Promise<{
-  answers: Record<string, ScoreAnswer>;
-  usage: Usage | undefined;
+  answers: Record<string, ScoreAnswer>
+  usage: Usage | undefined
 }> {
-  let lastError = "no attempt made";
+  let lastError = "no attempt made"
   for (let attempt = 0; attempt <= retries; attempt++) {
-    if (attempt) await sleep(Math.min(30_000, 2_000 * 2 ** (attempt - 1)));
+    if (attempt) await sleep(Math.min(30_000, 2000 * 2 ** (attempt - 1)))
     try {
       const response = await fetch(cfg.endpoint, {
         method: "POST",
@@ -355,52 +319,45 @@ async function judgeRead(
         },
         body: JSON.stringify({ model: cfg.model, state, questions }),
         signal: AbortSignal.timeout(timeoutMs),
-      });
+      })
       if (!response.ok) {
-        const body = (await response.text().catch(() => "")).slice(0, 300);
-        lastError = `HTTP ${response.status}: ${body}`;
+        const body = (await response.text().catch(() => "")).slice(0, 300)
+        lastError = `HTTP ${response.status}: ${body}`
         if (response.status === 429 || response.status >= 500) {
-          const retryAfter = Number(response.headers.get("retry-after"));
-          if (Number.isFinite(retryAfter) && retryAfter > 0)
-            await sleep(Math.min(60_000, retryAfter * 1000));
-          continue;
+          const retryAfter = Number(response.headers.get("retry-after"))
+          if (Number.isFinite(retryAfter) && retryAfter > 0) await sleep(Math.min(60_000, retryAfter * 1000))
+          continue
         }
-        break;
+        break
       }
       const payload = (await response.json()) as {
-        answers?: Record<string, ScoreAnswer>;
-        usage?: Usage;
-      };
-      const answers = payload.answers ?? {};
-      if (
-        Object.keys(questions).some(
-          (id) => typeof answers[id]?.score !== "number",
-        )
-      ) {
-        lastError = `malformed judge response: ${JSON.stringify(payload).slice(0, 300)}`;
-        continue;
+        answers?: Record<string, ScoreAnswer>
+        usage?: Usage
       }
-      return { answers, usage: payload.usage };
+      const answers = payload.answers ?? {}
+      if (Object.keys(questions).some((id) => typeof answers[id]?.score !== "number")) {
+        lastError = `malformed judge response: ${JSON.stringify(payload).slice(0, 300)}`
+        continue
+      }
+      return { answers, usage: payload.usage }
     } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
+      lastError = error instanceof Error ? error.message : String(error)
     }
   }
-  throw new Error(
-    `judge call failed after ${retries + 1} attempts: ${lastError}`,
-  );
+  throw new Error(`judge call failed after ${retries + 1} attempts: ${lastError}`)
 }
 
 type CandidateAudit = {
-  provider: string;
-  reads: { answers: Record<string, ScoreAnswer>; usage: Usage | undefined }[];
-  error: string | undefined;
-};
+  provider: string
+  reads: { answers: Record<string, ScoreAnswer>; usage: Usage | undefined }[]
+  error: string | undefined
+}
 
 type JudgeResult = {
-  scores: Record<string, number[]>;
-  confidences: Record<string, number[]>;
-  judgements: CandidateAudit[];
-};
+  scores: Record<string, number[]>
+  confidences: Record<string, number[]>
+  judgements: CandidateAudit[]
+}
 
 async function judgeCandidate(
   cfg: JudgeConfig,
@@ -416,28 +373,22 @@ async function judgeCandidate(
       instructions: JUDGE_INSTRUCTIONS,
       criteria: SCORE_LEVELS,
     },
-  };
-  const referenceCandidate =
-    reference && candidate.provider !== "native" ? reference : undefined;
-  const candidateTokens = tokenEstimate(judgeView(candidate.content));
-  const referenceTokens = referenceCandidate
-    ? tokenEstimate(judgeView(referenceCandidate.content))
-    : 0;
-  const share = candidateTokens / (candidateTokens + referenceTokens || 1);
+  }
+  const referenceCandidate = reference && candidate.provider !== "native" ? reference : undefined
+  const candidateTokens = tokenEstimate(judgeView(candidate.content))
+  const referenceTokens = referenceCandidate ? tokenEstimate(judgeView(referenceCandidate.content)) : 0
+  const share = candidateTokens / (candidateTokens + referenceTokens || 1)
   const audit: CandidateAudit = {
     provider: candidate.provider,
     reads: [],
     error: undefined,
-  };
+  }
   for (let read = 0; read < parsed.reads; read++) {
-    for (let budget = TOKEN_BUDGET - 2_000; ; budget = Math.floor(budget / 2)) {
-      const fitted = fitContent(judgeView(candidate.content), budget * share);
+    for (let budget = TOKEN_BUDGET - 2000; ; budget = Math.floor(budget / 2)) {
+      const fitted = fitContent(judgeView(candidate.content), budget * share)
       const fittedReference = referenceCandidate
-        ? fitContent(
-            judgeView(referenceCandidate.content),
-            budget * (1 - share),
-          )
-        : undefined;
+        ? fitContent(judgeView(referenceCandidate.content), budget * (1 - share))
+        : undefined
       const state = {
         url,
         ...(referenceCandidate && fittedReference
@@ -458,17 +409,11 @@ async function judgeCandidate(
             content: fitted.content,
           },
         },
-      };
+      }
       try {
-        const { answers, usage } = await judgeRead(
-          cfg,
-          state,
-          questions,
-          parsed.retries,
-          parsed.timeout * 1000,
-        );
-        const scored = { [candidate.provider]: answers.candidate ?? {} };
-        audit.reads.push({ answers: scored, usage });
+        const { answers, usage } = await judgeRead(cfg, state, questions, parsed.retries, parsed.timeout * 1000)
+        const scored = { [candidate.provider]: answers.candidate ?? {} }
+        audit.reads.push({ answers: scored, usage })
         if (auditDir)
           await writeFile(
             join(auditDir, `${candidate.provider}-read-${read}.json`),
@@ -481,24 +426,19 @@ async function judgeCandidate(
               null,
               2,
             ),
-          );
-        break;
-      } catch (error) {
-        if (
-          budget > 4_000 &&
-          /max_tokens_exceeded/i.test(
-            error instanceof Error ? error.message : String(error),
           )
-        ) {
-          continue;
+        break
+      } catch (error) {
+        if (budget > 4000 && MAX_TOKENS_EXCEEDED.test(error instanceof Error ? error.message : String(error))) {
+          continue
         }
-        audit.error = error instanceof Error ? error.message : String(error);
-        break;
+        audit.error = error instanceof Error ? error.message : String(error)
+        break
       }
     }
-    if (audit.error) break;
+    if (audit.error) break
   }
-  return audit;
+  return audit
 }
 
 async function judgeURL(
@@ -508,7 +448,7 @@ async function judgeURL(
   parsed: Parsed,
   auditDir: string | undefined,
 ): Promise<JudgeResult> {
-  if (auditDir) await mkdir(auditDir, { recursive: true });
+  if (auditDir) await mkdir(auditDir, { recursive: true })
   const judgements = await mapConcurrent(
     candidates,
     (candidate) =>
@@ -521,82 +461,84 @@ async function judgeURL(
         auditDir,
       ),
     JUDGE_CONCURRENCY,
-  );
-  const scores: Record<string, number[]> = {};
-  const confidences: Record<string, number[]> = {};
+  )
+  const scores: Record<string, number[]> = {}
+  const confidences: Record<string, number[]> = {}
   for (const { provider, reads } of judgements)
     for (const { answers } of reads) {
-      const answer = answers[provider];
-      if (typeof answer?.score === "number")
-        (scores[provider] ??= []).push(answer.score);
-      if (typeof answer?.confidence === "number")
-        (confidences[provider] ??= []).push(answer.confidence);
+      const answer = answers[provider]
+      if (typeof answer?.score === "number") {
+        const providerScores = scores[provider] ?? []
+        providerScores.push(answer.score)
+        scores[provider] = providerScores
+      }
+      if (typeof answer?.confidence === "number") {
+        const providerConfidences = confidences[provider] ?? []
+        providerConfidences.push(answer.confidence)
+        confidences[provider] = providerConfidences
+      }
     }
-  return { scores, confidences, judgements };
+  return { scores, confidences, judgements }
 }
 
-const mean = (values: number[]) =>
-  values.reduce((sum, value) => sum + value, 0) / values.length;
+const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
 
 const stddev = (values: number[]) => {
-  if (values.length < 2) return 0;
-  const average = mean(values);
-  return Math.sqrt(mean(values.map((value) => (value - average) ** 2)));
-};
+  if (values.length < 2) return 0
+  const average = mean(values)
+  return Math.sqrt(mean(values.map((value) => (value - average) ** 2)))
+}
 
-type ScoreStat = { mean: number; stddev: number; confidence: number | null };
+type ScoreStat = { mean: number; stddev: number; confidence: number | null }
 type CandidateReport = {
-  format: string | undefined;
-  size: number;
-  error: string | undefined;
-};
+  format: string | undefined
+  size: number
+  error: string | undefined
+}
 type URLReport = {
-  url: string;
-  candidates: Record<string, CandidateReport>;
-  scores: Record<string, ScoreStat>;
-  judgements: CandidateAudit[];
-  judgeError: string | undefined;
-};
+  url: string
+  candidates: Record<string, CandidateReport>
+  scores: Record<string, ScoreStat>
+  judgements: CandidateAudit[]
+  judgeError: string | undefined
+}
 
-function toStats(
-  scores: Record<string, number[]>,
-  confidences: Record<string, number[]>,
-): Record<string, ScoreStat> {
+function toStats(scores: Record<string, number[]>, confidences: Record<string, number[]>): Record<string, ScoreStat> {
   return Object.fromEntries(
-    Object.entries(scores).map(([id, values]) => [
-      id,
-      {
-        mean: mean(values),
-        stddev: stddev(values),
-        confidence: confidences[id] ? mean(confidences[id]!) : null,
-      },
-    ]),
-  );
+    Object.entries(scores).map(([id, values]) => {
+      const confidenceValues = confidences[id]
+      return [
+        id,
+        {
+          mean: mean(values),
+          stddev: stddev(values),
+          confidence: confidenceValues ? mean(confidenceValues) : null,
+        },
+      ]
+    }),
+  )
 }
 
 function table(headers: string[], rows: string[][]) {
   const widths = headers.map((header, column) =>
     Math.max(header.length, ...rows.map((row) => (row[column] ?? "").length)),
-  );
-  const line = (cells: string[]) =>
-    cells.map((cell, column) => cell.padEnd(widths[column]!)).join("  ");
-  console.log(line(headers));
-  for (const row of rows) console.log(line(row));
+  )
+  const line = (cells: string[]) => cells.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join("  ")
+  console.log(line(headers))
+  for (const row of rows) console.log(line(row))
 }
 
-const clip = (text: string, limit = 60) =>
-  text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+const clip = (text: string, limit = 60) => (text.length > limit ? `${text.slice(0, limit - 1)}…` : text)
 
 function printURLReport(report: URLReport) {
-  console.log(`\n── ${report.url}`);
-  const scored = Object.entries(report.scores).sort(
-    ([, a], [, b]) => b.mean - a.mean,
-  );
+  console.log(`\n── ${report.url}`)
+  const scored = Object.entries(report.scores).sort(([, a], [, b]) => b.mean - a.mean)
   table(
     ["provider", "score", "±sd", "conf", "format", "chars", "note"],
     [
       ...scored.map(([id, stat]) => {
-        const candidate = report.candidates[id]!;
+        const candidate = report.candidates[id]
+        if (!candidate) throw new Error(`missing candidate report for ${id}`)
         return [
           id,
           stat.mean.toFixed(1),
@@ -605,7 +547,7 @@ function printURLReport(report: URLReport) {
           candidate.format ?? "-",
           String(candidate.size),
           "",
-        ];
+        ]
       }),
       ...Object.entries(report.candidates)
         .filter(([id]) => !report.scores[id])
@@ -619,39 +561,34 @@ function printURLReport(report: URLReport) {
           clip(candidate.error ?? report.judgeError ?? "not judged"),
         ]),
     ],
-  );
+  )
 }
 
 type SummaryRow = {
-  provider: string;
-  avg: number | null;
-  scored: number;
-  failed: number;
-  note: string | undefined;
-};
+  provider: string
+  avg: number | null
+  scored: number
+  failed: number
+  note: string | undefined
+}
 
-function summarize(
-  reports: URLReport[],
-  selection: { provider: FetchProvider; skip?: string }[],
-): SummaryRow[] {
+function summarize(reports: URLReport[], selection: { provider: FetchProvider; skip?: string }[]): SummaryRow[] {
   return [...new Set(["native", ...selection.map((row) => row.provider.id)])]
     .map((id) => {
-      const means = reports
-        .map((report) => report.scores[id]?.mean)
-        .filter((value): value is number => value != null);
+      const means = reports.map((report) => report.scores[id]?.mean).filter((value): value is number => value != null)
       return {
         provider: id,
         avg: means.length ? mean(means) : null,
         scored: means.length,
         failed: reports.filter((report) => report.candidates[id]?.error).length,
         note: selection.find((row) => row.provider.id === id)?.skip,
-      };
+      }
     })
-    .sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
+    .sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1))
 }
 
 function printSummary(summary: SummaryRow[], total: number) {
-  console.log(`\n── summary (avg of per-URL mean scores, ${total} urls)`);
+  console.log(`\n── summary (avg of per-URL mean scores, ${total} urls)`)
   table(
     ["provider", "avg", "scored", "failed", "note"],
     summary.map((row) => [
@@ -661,116 +598,86 @@ function printSummary(summary: SummaryRow[], total: number) {
       String(row.failed),
       clip(row.note ?? "", 50),
     ]),
-  );
+  )
 }
 
 async function readURLsFile(path: string | undefined): Promise<string[]> {
-  if (!path) return [];
-  const text = await readFile(path, "utf8");
+  if (!path) return []
+  const text = await readFile(path, "utf8")
   return text
-    .split(/\r?\n/)
+    .split(URL_FILE_LINES)
     .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith("#"));
+    .filter((line) => line && !line.startsWith("#"))
 }
 
 function urlSlug(url: string): string {
   const base =
-    url
-      .replace(/^https?:\/\//i, "")
-      .replace(/[^a-zA-Z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "url";
-  return `${base}-${Bun.hash(url).toString(36).slice(0, 6)}`;
+    url.replace(URL_SCHEME, "").replace(SLUG_CHARACTERS, "-").replace(SLUG_EDGE_DASHES, "").slice(0, 80) || "url"
+  return `${base}-${Bun.hash(url).toString(36).slice(0, 6)}`
 }
 
 async function main() {
-  const parsed = parseArgv(process.argv.slice(2));
-  const positions = [...parsed._, ...(await readURLsFile(parsed.urls))].map(
-    (url) => (/^https?:\/\//i.test(url) ? url : `https://${url}`),
-  );
-  const urls = [...new Set(positions)];
-  if (!urls.length) throw new Error(USAGE);
-  const ctx = buildContext(parsed);
-  const cfg = judgeConfig(ctx);
-  const selection = selectProviders(
-    parsed,
-    parsed.providers.length ? parsed.providers : undefined,
-  );
-  const selected = selection.filter((row) => !row.skip);
+  const parsed = parseArgv(process.argv.slice(2))
+  const positions = [...parsed._, ...(await readURLsFile(parsed.urls))].map((url) =>
+    URL_SCHEME.test(url) ? url : `https://${url}`,
+  )
+  const urls = [...new Set(positions)]
+  if (!urls.length) throw new Error(USAGE)
+  const ctx = buildContext(parsed)
+  const cfg = judgeConfig(ctx)
+  const selection = selectProviders(parsed, parsed.providers.length ? parsed.providers : undefined)
+  const selected = selection.filter((row) => !row.skip)
 
-  console.log("── plan");
-  console.log(`   urls: ${urls.length}`);
-  console.log(
-    `   providers: native(defuddle) + ${selected.map((row) => row.provider.id).join(", ") || "(none)"}`,
-  );
-  for (const { provider, skip } of selection)
-    if (skip) console.log(`   skipped: ${provider.id}: ${skip}`);
-  console.log(
-    `   judge: ${cfg.model} @ ${cfg.endpoint} x${parsed.reads} reads/candidate`,
-  );
+  console.log("── plan")
+  console.log(`   urls: ${urls.length}`)
+  console.log(`   providers: native(defuddle) + ${selected.map((row) => row.provider.id).join(", ") || "(none)"}`)
+  for (const { provider, skip } of selection) if (skip) console.log(`   skipped: ${provider.id}: ${skip}`)
+  console.log(`   judge: ${cfg.model} @ ${cfg.endpoint} x${parsed.reads} reads/candidate`)
 
-  const fetchSignal = AbortSignal.timeout(parsed.timeout * 1000);
-  const providers = [undefined, ...selected.map((row) => row.provider)];
-  console.log(
-    `\n── fetching ${urls.length} urls × ${providers.length} providers (concurrency ${FETCH_CONCURRENCY})`,
-  );
+  const fetchSignal = AbortSignal.timeout(parsed.timeout * 1000)
+  const providers = [undefined, ...selected.map((row) => row.provider)]
+  console.log(`\n── fetching ${urls.length} urls × ${providers.length} providers (concurrency ${FETCH_CONCURRENCY})`)
   const rows = (
     await mapConcurrent(
       providers,
       async (provider) => {
-        const id = provider?.id ?? "native";
-        const started = Date.now();
-        const providerRows = await fetchProvider(
-          urls,
-          parsed,
-          provider,
-          fetchSignal,
-        );
-        const ok = providerRows.filter((row) => row.content).length;
+        const id = provider?.id ?? "native"
+        const started = Date.now()
+        const providerRows = await fetchProvider(urls, parsed, provider, fetchSignal)
+        const ok = providerRows.filter((row) => row.content).length
         console.log(
           `   fetched ${id.padEnd(12)} ${ok}/${providerRows.length} ok in ${Math.round((Date.now() - started) / 1000)}s` +
             (ok === providerRows.length
               ? ""
-              : `, first error: ${clip(
-                  providerRows.find((row) => row.error)?.error ??
-                    "no content returned",
-                  80,
-                )}`),
-        );
-        return providerRows;
+              : `, first error: ${clip(providerRows.find((row) => row.error)?.error ?? "no content returned", 80)}`),
+        )
+        return providerRows
       },
       FETCH_CONCURRENCY,
       fetchSignal,
     )
-  ).flat();
+  ).flat()
 
-  const stamp = new Date()
-    .toISOString()
-    .slice(0, 19)
-    .replace("T", "-")
-    .replace(/:/g, "");
-  const runDir = join(parsed.saveDir, stamp);
-  const reports: URLReport[] = [];
-  let judgeCalls = 0;
-  let judgeInputTokens = 0;
+  const stamp = new Date().toISOString().slice(0, 19).replace("T", "-").replace(/:/g, "")
+  const runDir = join(parsed.saveDir, stamp)
+  const reports: URLReport[] = []
+  let judgeCalls = 0
+  let judgeInputTokens = 0
 
   for (const url of urls) {
-    const urlRows = rows.filter((row) => row.url === url);
-    const urlDir = join(runDir, urlSlug(url));
-    const candidates: Candidate[] = [];
+    const urlRows = rows.filter((row) => row.url === url)
+    const urlDir = join(runDir, urlSlug(url))
+    const candidates: Candidate[] = []
     for (const row of urlRows) {
-      if (!row.content) continue;
+      if (!row.content) continue
       candidates.push({
         provider: row.provider,
         format: row.format ?? "unknown",
         size: row.content.length,
         content: row.content,
-      });
-      await mkdir(join(urlDir, "candidates"), { recursive: true });
-      await writeFile(
-        join(urlDir, "candidates", `${row.provider}.md`),
-        row.content,
-      );
+      })
+      await mkdir(join(urlDir, "candidates"), { recursive: true })
+      await writeFile(join(urlDir, "candidates", `${row.provider}.md`), row.content)
     }
     const report: URLReport = {
       url,
@@ -787,39 +694,28 @@ async function main() {
       scores: {},
       judgements: [],
       judgeError: undefined,
-    };
+    }
     if (candidates.length >= 2) {
-      const judged = await judgeURL(
-        cfg,
-        url,
-        candidates,
-        parsed,
-        join(urlDir, "judge"),
-      );
-      report.scores = toStats(judged.scores, judged.confidences);
-      report.judgements = judged.judgements;
+      const judged = await judgeURL(cfg, url, candidates, parsed, join(urlDir, "judge"))
+      report.scores = toStats(judged.scores, judged.confidences)
+      report.judgements = judged.judgements
       for (const judgement of judged.judgements) {
-        judgeCalls += judgement.reads.length;
-        judgeInputTokens += judgement.reads.reduce(
-          (sum, read) => sum + (read.usage?.input_tokens ?? 0),
-          0,
-        );
+        judgeCalls += judgement.reads.length
+        judgeInputTokens += judgement.reads.reduce((sum, read) => sum + (read.usage?.input_tokens ?? 0), 0)
       }
     } else {
-      report.judgeError = `fewer than 2 successful extractions (${candidates.length})`;
+      report.judgeError = `fewer than 2 successful extractions (${candidates.length})`
     }
-    reports.push(report);
-    printURLReport(report);
+    reports.push(report)
+    printURLReport(report)
   }
 
-  const summary = summarize(reports, selection);
-  printSummary(summary, reports.length);
-  console.log(
-    `\n── judge usage: ${judgeCalls} calls, ~${judgeInputTokens} input tokens`,
-  );
+  const summary = summarize(reports, selection)
+  printSummary(summary, reports.length)
+  console.log(`\n── judge usage: ${judgeCalls} calls, ~${judgeInputTokens} input tokens`)
 
-  const resultsPath = join(runDir, "results.json");
-  await mkdir(dirname(resultsPath), { recursive: true });
+  const resultsPath = join(runDir, "results.json")
+  await mkdir(dirname(resultsPath), { recursive: true })
   await writeFile(
     resultsPath,
     JSON.stringify(
@@ -832,20 +728,22 @@ async function main() {
         },
         skipped: selection
           .filter((row) => row.skip)
-          .map((row) => ({ id: row.provider.id, reason: row.skip })),
+          .map((row) => {
+            return { id: row.provider.id, reason: row.skip }
+          }),
         reports,
         summary,
       },
       null,
       2,
     ),
-  );
-  console.log(`   saved: ${resultsPath}`);
-  if (parsed.json) console.log(JSON.stringify({ reports, summary }, null, 2));
+  )
+  console.log(`   saved: ${resultsPath}`)
+  if (parsed.json) console.log(JSON.stringify({ reports, summary }, null, 2))
 }
 
 try {
-  await main();
+  await main()
 } catch (error) {
   console.error(
     error instanceof RotateConfigError
@@ -853,6 +751,6 @@ try {
       : error instanceof Error
         ? error.message
         : String(error),
-  );
-  process.exitCode = 1;
+  )
+  process.exitCode = 1
 }

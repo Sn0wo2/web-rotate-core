@@ -1,29 +1,29 @@
-import { perplexity } from "./perplexity";
-import { octen } from "./octen";
-import { tavily } from "./tavily";
-import { parallel } from "./parallel";
-import { you } from "./you";
-import { nimble } from "./nimble";
-import { exa } from "./exa";
-import { brave } from "./brave";
-import { hyperbrowser } from "./hyperbrowser";
-import { firecrawl } from "./firecrawl";
-import { tinyfish } from "./tinyfish";
-import { keenable } from "./keenable";
-import { serper } from "./serper";
-import { bocha } from "./bocha";
-import { jina } from "./jina";
-import { scrapingbee } from "./scrapingbee";
-import { diffbot } from "./diffbot";
-import { brightdata } from "./brightdata";
-import { linkup } from "./linkup";
-import { doubao } from "./doubao";
-import { deepseek } from "./deepseek";
-import { openai } from "./openai";
-import { native } from "./native";
-import { zhipu } from "./zhipu";
+import { bocha } from "./bocha"
+import { brave } from "./brave"
+import { brightdata } from "./brightdata"
+import { deepseek } from "./deepseek"
+import { diffbot } from "./diffbot"
+import { doubao } from "./doubao"
+import { exa } from "./exa"
+import { firecrawl } from "./firecrawl"
+import { hyperbrowser } from "./hyperbrowser"
+import { jina } from "./jina"
+import { keenable } from "./keenable"
+import { linkup } from "./linkup"
+import { native } from "./native"
+import { nimble } from "./nimble"
+import { octen } from "./octen"
+import { openai } from "./openai"
+import { parallel } from "./parallel"
+import { perplexity } from "./perplexity"
+import { scrapingbee } from "./scrapingbee"
+import { serper } from "./serper"
+import { tavily } from "./tavily"
+import { tinyfish } from "./tinyfish"
+import { you } from "./you"
+import { zhipu } from "./zhipu"
 
-type Registered<P, ID extends string> = Omit<P, "id"> & { id: ID };
+type Registered<P, ID extends string> = Omit<P, "id"> & { id: ID }
 
 export const SEARCH_PROVIDERS = [
   perplexity as Registered<typeof perplexity, "perplexity">,
@@ -50,4 +50,4 @@ export const SEARCH_PROVIDERS = [
   openai as Registered<typeof openai, "openai">,
   native as Registered<typeof native, "native">,
   zhipu as Registered<typeof zhipu, "zhipu">,
-] as const;
+] as const

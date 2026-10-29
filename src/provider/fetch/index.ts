@@ -1,24 +1,24 @@
-import { tavily } from "./tavily";
-import { parallel } from "./parallel";
-import { you } from "./you";
-import { exa } from "./exa";
-import { hyperbrowser } from "./hyperbrowser";
-import { firecrawl } from "./firecrawl";
-import { tinyfish } from "./tinyfish";
-import { jina } from "./jina";
-import { scrapingant } from "./scrapingant";
-import { scrapingbee } from "./scrapingbee";
-import { scrapfly } from "./scrapfly";
-import { diffbot } from "./diffbot";
-import { brightdata } from "./brightdata";
-import { apify } from "./apify";
-import { linkup } from "./linkup";
-import { deepseek } from "./deepseek";
-import { bocha } from "./bocha";
-import { native } from "./native";
-import { zhipu } from "./zhipu";
+import { apify } from "./apify"
+import { bocha } from "./bocha"
+import { brightdata } from "./brightdata"
+import { deepseek } from "./deepseek"
+import { diffbot } from "./diffbot"
+import { exa } from "./exa"
+import { firecrawl } from "./firecrawl"
+import { hyperbrowser } from "./hyperbrowser"
+import { jina } from "./jina"
+import { linkup } from "./linkup"
+import { native } from "./native"
+import { parallel } from "./parallel"
+import { scrapfly } from "./scrapfly"
+import { scrapingant } from "./scrapingant"
+import { scrapingbee } from "./scrapingbee"
+import { tavily } from "./tavily"
+import { tinyfish } from "./tinyfish"
+import { you } from "./you"
+import { zhipu } from "./zhipu"
 
-type Registered<P, ID extends string> = Omit<P, "id"> & { id: ID };
+type Registered<P, ID extends string> = Omit<P, "id"> & { id: ID }
 
 export const FETCH_PROVIDERS = [
   tavily as Registered<typeof tavily, "tavily">,
@@ -40,4 +40,4 @@ export const FETCH_PROVIDERS = [
   bocha as Registered<typeof bocha, "bocha">,
   native as Registered<typeof native, "native">,
   zhipu as Registered<typeof zhipu, "zhipu">,
-] as const;
+] as const

@@ -1,10 +1,10 @@
-import { z } from "zod";
-import { apiJSON } from "../../shared/http";
-import type { SearchProvider } from "./types";
-import { mcpJSON } from "../mcp";
-import { requireKey } from "../utils";
-import { clamp } from "es-toolkit/math";
-import { searchResponse } from "./utils";
+import { clamp } from "es-toolkit/math"
+import { z } from "zod"
+import { apiJSON } from "../../shared/http"
+import { mcpJSON } from "../mcp"
+import { requireKey } from "../utils"
+import type { SearchProvider } from "./types"
+import { searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({
   mode: z.string().optional(),
@@ -21,8 +21,8 @@ const settingsSchema = z.looseObject({
         .optional(),
     })
     .optional(),
-});
-type ParallelSearchSettings = z.output<typeof settingsSchema>;
+})
+type ParallelSearchSettings = z.output<typeof settingsSchema>
 
 export const parallel = {
   id: "parallel",
@@ -38,11 +38,10 @@ export const parallel = {
         "web_search",
         { objective: queries[0], search_queries: queries },
         signal,
-      );
-      return searchResponse(payload);
+      )
+      return searchResponse(payload)
     }
-    const { mode, advanced_settings, max_results, processor, ...rest } =
-      settings;
+    const { mode, advanced_settings, max_results, processor, ...rest } = settings
     const payload = await apiJSON("https://api.parallel.ai/v1/search", signal, {
       headers: { "x-api-key": requireKey("parallel", key) },
       body: {
@@ -56,13 +55,9 @@ export const parallel = {
             ...advanced_settings?.fetch_policy,
             max_age_seconds: Math.max(
               600,
-              Math.trunc(
-                advanced_settings?.fetch_policy?.max_age_seconds ??
-                  globals.cacheWindowSeconds,
-              ),
+              Math.trunc(advanced_settings?.fetch_policy?.max_age_seconds ?? globals.cacheWindowSeconds),
             ),
-            disable_cache_fallback:
-              advanced_settings?.fetch_policy?.disable_cache_fallback ?? true,
+            disable_cache_fallback: advanced_settings?.fetch_policy?.disable_cache_fallback ?? true,
           },
           excerpt_settings: {
             max_chars_per_result: 1000,
@@ -71,7 +66,7 @@ export const parallel = {
           max_results: max_results ?? clamp(globals.searchResults, 1, 20),
         },
       },
-    });
-    return searchResponse(payload);
+    })
+    return searchResponse(payload)
   },
-} satisfies SearchProvider<ParallelSearchSettings>;
+} satisfies SearchProvider<ParallelSearchSettings>

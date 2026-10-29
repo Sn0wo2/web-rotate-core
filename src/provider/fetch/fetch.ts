@@ -1,35 +1,26 @@
-import { clamp } from "es-toolkit/math";
-import { orderBy } from "es-toolkit/array";
-import { omit } from "es-toolkit/object";
-import { HTTPError } from "../../shared/http";
-import { RotateConfigError, globalsSchema } from "../../shared/config";
-import { mapConcurrent } from "../../shared/utils";
-import type { URLList } from "../../shared/types";
-import { providerRoutes, resolveProviderEntries } from "../rotation";
-import type { ProviderEntry } from "../types";
-import { FETCH_PROVIDERS } from "./index";
-import { fetchImage } from "./image";
-import type {
-  FetchFormat,
-  FetchOutcome,
-  FetchPage,
-  FetchProvider,
-  FetchProviderConfigBase,
-} from "./types";
+import { orderBy } from "es-toolkit/array"
+import { clamp } from "es-toolkit/math"
+import { omit } from "es-toolkit/object"
+import { globalsSchema, RotateConfigError } from "../../shared/config"
+import { HTTPError } from "../../shared/http"
+import type { URLList } from "../../shared/types"
+import { mapConcurrent } from "../../shared/utils"
+import { providerRoutes, resolveProviderEntries } from "../rotation"
+import type { ProviderEntry } from "../types"
+import { fetchImage } from "./image"
+import { FETCH_PROVIDERS } from "./index"
+import type { FetchFormat, FetchOutcome, FetchPage, FetchProvider, FetchProviderConfigBase } from "./types"
 
 export type FetchProviderConfig<P extends readonly FetchProvider[] = []> = {
-  cacheWindowSeconds?: number | undefined;
-  providers?:
-    | (FetchProviderConfigBase<typeof FETCH_PROVIDERS> &
-        FetchProviderConfigBase<NoInfer<P>>)
-    | undefined;
-  cleanup?: "none" | "defuddle" | undefined;
-  prefer?: "keyed" | "keyless" | undefined;
-  concurrency?: number | undefined;
-  maxAttempts?: number | undefined;
-};
+  cacheWindowSeconds?: number | undefined
+  providers?: (FetchProviderConfigBase<typeof FETCH_PROVIDERS> & FetchProviderConfigBase<NoInfer<P>>) | undefined
+  cleanup?: "none" | "defuddle" | undefined
+  prefer?: "keyed" | "keyless" | undefined
+  concurrency?: number | undefined
+  maxAttempts?: number | undefined
+}
 
-export type DefaultFetchProviderConfig = FetchProviderConfig;
+export type DefaultFetchProviderConfig = FetchProviderConfig
 
 export const DEFAULT_FETCH_PROVIDER_CONFIG: DefaultFetchProviderConfig = {
   cacheWindowSeconds: 0,
@@ -54,7 +45,7 @@ export const DEFAULT_FETCH_PROVIDER_CONFIG: DefaultFetchProviderConfig = {
     native: {},
     zhipu: {},
   },
-};
+}
 
 export async function fetchWeb<P extends readonly FetchProvider[] = []>({
   urls,
@@ -63,53 +54,45 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
   config = {},
   implementations,
 }: {
-  urls: URLList;
-  format: FetchFormat;
-  signal: AbortSignal;
-  config?: FetchProviderConfig<P> | undefined;
-  implementations?: P | undefined;
+  urls: URLList
+  format: FetchFormat
+  signal: AbortSignal
+  config?: FetchProviderConfig<P> | undefined
+  implementations?: P | undefined
 }): Promise<FetchOutcome> {
-  const globals = globalsSchema.parse(config);
-  const registry = new Map<string, FetchProvider>();
-  for (const provider of [...FETCH_PROVIDERS, ...(implementations ?? [])])
-    registry.set(provider.id, provider);
-  const enabled = [...registry.values()];
+  const globals = globalsSchema.parse(config)
+  const registry = new Map<string, FetchProvider>()
+  for (const provider of [...FETCH_PROVIDERS, ...(implementations ?? [])]) registry.set(provider.id, provider)
+  const enabled = [...registry.values()]
   const entries = resolveProviderEntries(
     enabled,
     config.providers as Record<string, ProviderEntry> | undefined,
     "fetch",
-  );
-  const pool = providerRoutes(enabled, entries, globals);
-  const nativeOnly = entries.size === 1 && entries.has("native");
-  signal.throwIfAborted();
-  if (!urls.length) throw new RotateConfigError("fetch URLs must not be empty");
+  )
+  const pool = providerRoutes(enabled, entries, globals)
+  const nativeOnly = entries.size === 1 && entries.has("native")
+  signal.throwIfAborted()
+  if (!urls.length) throw new RotateConfigError("fetch URLs must not be empty")
 
-  const image = await fetchImage(
-    urls,
-    signal,
-    entries.has("native"),
-    nativeOnly,
-  );
-  if (image) return image;
+  const image = await fetchImage(urls, signal, entries.has("native"), nativeOnly)
+  if (image) return image
 
   const candidates = orderBy(
     pool.filter((route) => format !== "html" || route.formats.includes("html")),
     ["weight"],
     ["desc"],
-  );
-  const pagesByURL = new Map<string, FetchPage>();
-  const errorsByURL = new Map<string, string>();
-  const blocked = new Set<string>();
-  let pendingURLs = [...new Set(urls)];
-  const maxAttempts = Math.max(
-    1,
-    Math.min(globals.maxAttempts, candidates.length),
-  );
-  let attempts = 0;
+  )
+  const pagesByURL = new Map<string, FetchPage>()
+  const errorsByURL = new Map<string, string>()
+  const blocked = new Set<string>()
+  let pendingURLs = [...new Set(urls)]
+  const maxAttempts = Math.max(1, Math.min(globals.maxAttempts, candidates.length))
+  let attempts = 0
   for (const route of candidates) {
-    if (!pendingURLs.length || attempts >= maxAttempts) break;
-    if (blocked.has(route.id)) continue;
-    attempts++;
+    if (!pendingURLs.length || attempts >= maxAttempts) break
+    const fallbackFormat = route.formats[0]
+    if (blocked.has(route.id) || fallbackFormat === undefined) continue
+    attempts++
     try {
       const nativeFormat =
         globals.cleanup !== "none" && route.formats.includes("html")
@@ -120,7 +103,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
               ? "html"
               : route.formats.includes("markdown")
                 ? "markdown"
-                : route.formats[0]!;
+                : fallbackFormat
       const routePages = await route.run({
         settings: route.settings,
         key: route.key,
@@ -128,45 +111,39 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
         signal,
         format: nativeFormat,
         globals,
-      });
-      signal.throwIfAborted();
+      })
+      signal.throwIfAborted()
       const convertedPages = await mapConcurrent(
         routePages,
         async (page) => {
-          if (!page.content) return page;
+          if (!page.content) return page
           try {
-            if (!page.format)
-              throw new Error(`${route.id} did not report its content format`);
+            if (!page.format) throw new Error(`${route.id} did not report its content format`)
             return {
               ...page,
               provider: route.id,
-              ...(page.format === format &&
-              (page.format !== "html" || globals.cleanup === "none")
+              ...(page.format === format && (page.format !== "html" || globals.cleanup === "none")
                 ? {}
-                : await (
-                    await import("./cleanup")
-                  ).convertContent(
+                : await (await import("./cleanup")).convertContent(
                     page.content,
                     page.format,
                     page.finalURL ?? page.url,
                     format,
                     globals.cleanup,
                   )),
-            };
+            }
           } catch (error) {
-            if (signal.aborted) throw error;
+            if (signal.aborted) throw error
             return {
               ...omit(page, ["content"]),
               error: error instanceof Error ? error.message : String(error),
-            };
+            }
           }
         },
         clamp(globals.concurrency, 1, 16),
         signal,
-      );
-      const routePagesByURL = new Map(
-        convertedPages.map((page) => [page.url, page]),
-      );
+      )
+      const routePagesByURL = new Map(convertedPages.map((page) => [page.url, page]))
       if (
         convertedPages.some(
           (page) =>
@@ -175,38 +152,33 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
             new HTTPError(page.metadata.httpStatus, page.error).invalidRequest,
         )
       )
-        blocked.add(route.id);
-      const nextURLs: string[] = [];
+        blocked.add(route.id)
+      const nextURLs: string[] = []
       for (const url of pendingURLs) {
-        const page = routePagesByURL.get(url);
+        const page = routePagesByURL.get(url)
         if (page?.content) {
-          pagesByURL.set(url, page);
-          errorsByURL.delete(url);
+          pagesByURL.set(url, page)
+          errorsByURL.delete(url)
         } else {
-          if (page?.error) errorsByURL.set(url, page.error);
-          nextURLs.push(url);
+          if (page?.error) errorsByURL.set(url, page.error)
+          nextURLs.push(url)
         }
       }
-      pendingURLs = nextURLs;
+      pendingURLs = nextURLs
     } catch (error) {
-      if (signal.aborted || error instanceof RotateConfigError) throw error;
-      if (error instanceof HTTPError && error.invalidRequest)
-        blocked.add(route.id);
-      for (const url of pendingURLs)
-        errorsByURL.set(
-          url,
-          error instanceof Error ? error.message : String(error),
-        );
+      if (signal.aborted || error instanceof RotateConfigError) throw error
+      if (error instanceof HTTPError && error.invalidRequest) blocked.add(route.id)
+      for (const url of pendingURLs) errorsByURL.set(url, error instanceof Error ? error.message : String(error))
     }
   }
   const pages = urls.map((url) => {
-    const page = pagesByURL.get(url);
-    if (page) return page;
+    const page = pagesByURL.get(url)
+    if (page) return page
     return {
       url,
       error: errorsByURL.get(url) ?? "webfetch failed",
-    };
-  });
-  if (urls.length === 1 && pages[0]?.error) throw new Error(pages[0].error);
-  return { type: "pages", pages };
+    }
+  })
+  if (urls.length === 1 && pages[0]?.error) throw new Error(pages[0].error)
+  return { type: "pages", pages }
 }
