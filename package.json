@@ -3,9 +3,15 @@
   "version": "0.4.0",
   "description": "One Gateway for All WebSearch/WebFetch Providers!",
   "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sn0wo2/web-rotate-core.git"
+  },
   "packageManager": "bun@1.4.4",
   "files": [
-    "src"
+    "src",
+    "LICENSE"
   ],
   "exports": {
     ".": {
@@ -19,7 +25,9 @@
     "lint": "biome check --error-on-warnings .",
     "lint:fix": "biome check --write --error-on-warnings .",
     "security": "bun audit --registry=https://registry.npmjs.org",
-    "ci": "bun run lint && bun run check && bun run security"
+    "ci": "bun run lint && bun run check && bun run security",
+    "release": "goreleaser release --clean",
+    "release:dry": "goreleaser release --clean --snapshot"
   },
   "dependencies": {
     "@hyperbrowser/sdk": "^1.4.0",
