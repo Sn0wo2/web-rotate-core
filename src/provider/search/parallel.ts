@@ -1,12 +1,16 @@
 import { clamp } from "es-toolkit/math"
+import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import { z } from "zod"
+import { stringValue } from "../../shared/config"
 import { apiJSON } from "../../shared/http"
+import { mapConcurrent } from "../../shared/utils"
 import { mcpJSON } from "../mcp"
 import { requireKey } from "../utils"
 import type { SearchProvider } from "./types"
-import { searchResponse } from "./utils"
+import { answerResponse, searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({
+  api: z.enum(["search", "answer"]).optional(),
   mode: z.string().optional(),
   max_results: z.number().optional(),
   processor: z.unknown().optional(),
@@ -28,9 +32,46 @@ export const parallel = {
   id: "parallel",
   weight: 74,
   keyless: true,
+  keylessEnabled: (settings) => settings.api !== "answer",
   batchSize: Infinity,
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
+    const { api, mode, advanced_settings, max_results, processor, ...options } = settings
+    if (api === "answer") {
+      const apiKey = requireKey("parallel", key)
+      const payloads = await mapConcurrent(
+        queries,
+        (question) =>
+          apiJSON("https://api.parallel.ai/v1/responses", signal, {
+            headers: { Authorization: `Bearer ${apiKey}` },
+            body: {
+              ...options,
+              model: options.model ?? "parallel",
+              reasoning: options.reasoning ?? { effort: "medium" },
+              input: question,
+              stream: false,
+            },
+          }),
+        clamp(globals.concurrency, 1, 16),
+        signal,
+      )
+      const sources: Record<string, unknown>[] = []
+      const answers: string[] = []
+      for (const payload of payloads) {
+        const output = isRecord(payload) && Array.isArray(payload.output) ? payload.output : []
+        for (const item of output) {
+          if (!isRecord(item) || item.type !== "message" || !Array.isArray(item.content)) continue
+          for (const content of item.content) {
+            if (!isRecord(content) || content.type !== "output_text") continue
+            const text = stringValue(content.text)
+            if (text) answers.push(text)
+            if (Array.isArray(content.annotations)) sources.push(...content.annotations.filter(isRecord))
+          }
+        }
+      }
+      const answer = answers.join("\n\n")
+      return answerResponse({ answer, responses: payloads }, sources, answer)
+    }
     if (!key) {
       const payload = await mcpJSON(
         "https://search.parallel.ai/mcp",
@@ -41,12 +82,11 @@ export const parallel = {
       )
       return searchResponse(payload)
     }
-    const { mode, advanced_settings, max_results, processor, ...rest } = settings
     const payload = await apiJSON("https://api.parallel.ai/v1/search", signal, {
       headers: { "x-api-key": requireKey("parallel", key) },
       body: {
         mode: mode?.trim() || "fast",
-        ...rest,
+        ...options,
         objective: queries[0],
         search_queries: queries,
         advanced_settings: {

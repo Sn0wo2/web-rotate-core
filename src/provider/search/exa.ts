@@ -1,12 +1,15 @@
 import { clamp } from "es-toolkit/math"
+import { pick } from "es-toolkit/object"
+import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import Exa from "exa-js"
 import { z } from "zod"
 import { mcpCall } from "../mcp"
-import { sdkRequest } from "../utils"
+import { requireKey, sdkRequest } from "../utils"
 import type { SearchProvider } from "./types"
-import { searchResponse } from "./utils"
+import { answerResponse, searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({
+  api: z.enum(["search", "answer"]).optional(),
   contents: z.record(z.string(), z.unknown()).optional(),
 })
 type ExaSearchSettings = z.output<typeof settingsSchema>
@@ -20,8 +23,25 @@ export const exa = {
   id: "exa",
   weight: 73,
   keyless: true,
+  keylessEnabled: (settings) => settings.api !== "answer",
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
+    const { api, ...options } = settings
+    if (api === "answer") {
+      const client = new Exa(requireKey("exa", key))
+      const answerOptions: Record<string, unknown> = pick(options, [
+        "text",
+        "model",
+        "systemPrompt",
+        "outputSchema",
+        "userLocation",
+        "userIdentifier",
+      ])
+      const payload = await sdkRequest(signal, (requestSignal) =>
+        client.answer(queries[0], { ...answerOptions, stream: false }, { signal: requestSignal }),
+      )
+      return answerResponse(payload, payload.citations ?? [], payload.answer)
+    }
     if (!key) {
       const result = await mcpCall(
         "https://mcp.exa.ai/mcp",
@@ -45,16 +65,21 @@ export const exa = {
       }
       return blocks.length ? searchResponse(blocks) : { results: [], ...(text ? { metadata: { text } } : {}) }
     }
+    const contents: Record<string, unknown> =
+      settings.type === "lite"
+        ? pick(settings.contents ?? {}, ["text", "highlights", "snapshotAsOf"])
+        : (settings.contents ?? {})
+    if (settings.type === "lite" && isRecord(contents.text)) contents.text = pick(contents.text, ["maxCharacters"])
     const client = new Exa(key)
     const payload = await sdkRequest(signal, () =>
       client.search(queries[0], {
         type: "auto",
-        ...settings,
+        ...options,
         numResults: clamp(globals.searchResults, 1, 100),
         contents: {
           highlights: { maxCharacters: 1000 },
-          ...settings.contents,
-          maxAgeHours: Math.floor(globals.cacheWindowSeconds / 3600),
+          ...contents,
+          ...(settings.type === "lite" ? {} : { maxAgeHours: Math.floor(globals.cacheWindowSeconds / 3600) }),
         },
       }),
     )

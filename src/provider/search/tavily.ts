@@ -1,15 +1,19 @@
 import { clamp } from "es-toolkit/math"
 import { apiJSON, REQUEST_TIMEOUT_MS } from "../../shared/http"
 import { mcpJSON } from "../mcp"
+import { requireKey } from "../utils"
 import type { SearchProvider } from "./types"
-import { searchResponse } from "./utils"
+import { answerResponse, searchResponse } from "./utils"
 
 export const tavily = {
   id: "tavily",
   weight: 67,
   keyless: true,
+  keylessEnabled: (settings) => settings.api !== "answer",
   run: async ({ settings, key, queries, signal, globals }) => {
-    if (key && !Object.keys(settings).length) {
+    const { api, ...providerSettings } = settings
+    if (api === "answer") requireKey("tavily", key)
+    if (key && api !== "answer" && !Object.keys(providerSettings).length) {
       const payload = await mcpJSON(
         `https://mcp.tavily.com/mcp/?tavilyApiKey=${key}`,
         {},
@@ -23,7 +27,7 @@ export const tavily = {
       )
       return searchResponse(payload)
     }
-    const { timeout, sessionId, humanId, clientName, maxAgeHours, maxHours, ...options } = settings
+    const { timeout, sessionId, humanId, clientName, maxAgeHours, maxHours, ...options } = providerSettings
     const requestOptions = Object.fromEntries(
       Object.entries(options).map(([name, value]) => [
         (
@@ -60,7 +64,7 @@ export const tavily = {
         query: queries[0],
         search_depth: "basic",
         chunks_per_source: 1,
-        include_answer: false,
+        include_answer: api === "answer",
         include_raw_content: false,
         auto_parameters: false,
         topic: "general",
@@ -86,6 +90,8 @@ export const tavily = {
       timeoutMs:
         typeof timeout === "number" && timeout > 0 ? Math.min(REQUEST_TIMEOUT_MS, timeout * 1000) : REQUEST_TIMEOUT_MS,
     })
-    return searchResponse(payload)
+    return api === "answer" || requestOptions.include_answer
+      ? answerResponse(payload, payload)
+      : searchResponse(payload)
   },
 } satisfies SearchProvider

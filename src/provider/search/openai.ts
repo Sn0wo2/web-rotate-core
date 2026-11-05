@@ -8,6 +8,7 @@ import type { SearchProvider, SearchResponse, SearchResult } from "./types"
 import { searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({
+  api: z.enum(["search", "answer"]).optional(),
   model: z.string().optional(),
   instructions: z.string().optional(),
   max_output_tokens: z.number().optional(),
@@ -26,6 +27,7 @@ export const openai = {
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
     const {
+      api,
       model,
       instructions,
       max_output_tokens,
@@ -44,7 +46,9 @@ export const openai = {
         model: selectedModel,
         instructions:
           instructions?.trim() ||
-          `Search the web. Return at most ${clamp(globals.searchResults, 1, 100)} concise factual snippets, one per line with an inline citation. Do not write a long-form answer.`,
+          (api === "answer"
+            ? "Search the web and answer the question using reliable sources. Include inline citations for factual claims."
+            : `Search the web. Return at most ${clamp(globals.searchResults, 1, 100)} concise factual snippets, one per line with an inline citation. Do not write a long-form answer.`),
         max_output_tokens: max_output_tokens ?? 2048,
         ...(reasoning ? { reasoning } : selectedModel === "gpt-5-mini" ? { reasoning: { effort: "low" } } : {}),
         max_tool_calls: 1,

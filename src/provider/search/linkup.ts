@@ -1,14 +1,17 @@
+import get from "es-toolkit/compat/get"
 import { clamp } from "es-toolkit/math"
 import { apiJSON } from "../../shared/http"
 import { requireKey } from "../utils"
 import type { SearchProvider } from "./types"
-import { searchResponse } from "./utils"
+import { answerResponse, searchResponse } from "./utils"
 
 export const linkup = {
   id: "linkup",
   weight: 68,
   run: async ({ settings, key, queries, signal, globals }) => {
     const {
+      api,
+      outputType,
       depth,
       includeDomains,
       excludeDomains,
@@ -21,14 +24,14 @@ export const linkup = {
       structuredOutputSchema,
     }: Record<string, unknown> = {
       depth: "standard",
-      ...settings,
       maxResults: clamp(globals.searchResults, 1, 100),
+      ...settings,
     }
     const payload = await apiJSON("https://api.linkup.so/v1/search", signal, {
       key: requireKey("linkup", key),
       body: {
         depth,
-        outputType: "searchResults",
+        outputType: api === "answer" ? "sourcedAnswer" : (outputType ?? "searchResults"),
         q: queries[0],
         ...(includeDomains ? { includeDomains } : {}),
         ...(excludeDomains ? { excludeDomains } : {}),
@@ -56,6 +59,8 @@ export const linkup = {
           : {}),
       },
     })
+    if (api === "answer" || outputType === "sourcedAnswer")
+      return answerResponse(payload, get(payload, "sources"), get(payload, "answer"))
     return searchResponse(payload)
   },
 } satisfies SearchProvider

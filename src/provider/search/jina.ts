@@ -1,23 +1,61 @@
+import get from "es-toolkit/compat/get"
 import { clamp } from "es-toolkit/math"
+import { pick } from "es-toolkit/object"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
+import { lexer, walkTokens } from "marked"
 import { z } from "zod"
+import { stringValue } from "../../shared/config"
 import { apiJSON } from "../../shared/http"
-import { urlParams } from "../utils"
-import type { SearchProvider } from "./types"
-import { searchResponse } from "./utils"
+import { requireKey, urlParams } from "../utils"
+import type { SearchProvider, SearchResult } from "./types"
+import { answerResponse, searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({
+  api: z.enum(["search", "answer"]).optional(),
   headers: z.record(z.string(), z.string()).optional(),
 })
 type JinaSearchSettings = z.output<typeof settingsSchema>
+const FOOTNOTE_PREFIX = /^\[\^[^\]]+\]:[\t ]*/gm
+const THINK_BLOCK = /<think>[\s\S]*?<\/think>/g
 
 export const jina = {
   id: "jina",
   weight: 58,
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
-    if (!key) throw new Error("jina API key is not configured for search")
-    const { headers, ...options } = settings
+    const token = requireKey("jina", key)
+    const { api, headers, ...options } = settings
+    if (api === "answer") {
+      const answerOptions: Record<string, unknown> = pick(options, [
+        "model",
+        "temperature",
+        "max_tokens",
+        "top_p",
+        "presence_penalty",
+        "frequency_penalty",
+        "response_format",
+        "seed",
+        "stop",
+      ])
+      const payload = await apiJSON("https://deepsearch.jina.ai/v1/chat/completions", signal, {
+        key: token,
+        headers: headers ?? {},
+        body: {
+          model: "jina-deepsearch-v1",
+          ...answerOptions,
+          messages: [{ role: "user", content: queries[0] }],
+          stream: false,
+        },
+      })
+      const answer = stringValue(get(payload, "choices[0].message.content"))?.replace(THINK_BLOCK, "").trim()
+      const sources: SearchResult[] = []
+      if (answer)
+        void walkTokens(lexer(answer.replace(FOOTNOTE_PREFIX, "")), (part) => {
+          if (part.type === "link")
+            sources.push({ url: part.href, ...(part.text !== part.href ? { title: part.text } : {}) })
+        })
+      return answerResponse(payload, sources, answer)
+    }
     const endpoint = urlParams(new URL("https://s.jina.ai"), {
       num: clamp(globals.searchResults, 1, 20),
       ...options,
@@ -25,7 +63,7 @@ export const jina = {
     })
     const payload = await apiJSON(endpoint.toString(), signal, {
       headers: {
-        Authorization: `Bearer ${key}`,
+        Authorization: `Bearer ${token}`,
         "X-Respond-With": "no-content",
         ...headers,
         ...(globals.cacheWindowSeconds === 0

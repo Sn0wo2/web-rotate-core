@@ -1,20 +1,57 @@
+import get from "es-toolkit/compat/get"
 import { clamp } from "es-toolkit/math"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import { apiJSON } from "../../shared/http"
 import { requireKey } from "../utils"
 import type { SearchProvider } from "./types"
-import { searchResponse } from "./utils"
+import { answerResponse, searchResponse } from "./utils"
 
 export const you = {
   id: "you",
   weight: 74,
   run: async ({ settings, key, queries, signal, globals }) => {
+    const { api, ...searchSettings } = settings
+    if (api === "answer") {
+      const payload = await apiJSON("https://api.you.com/v1/answer", signal, {
+        label: "you",
+        body: {
+          query: queries[0],
+          ...(searchSettings.freshness !== undefined ? { freshness: searchSettings.freshness } : {}),
+          ...(searchSettings.country !== undefined ? { country: searchSettings.country } : {}),
+          ...(searchSettings.language !== undefined ? { language: searchSettings.language } : {}),
+          ...(searchSettings.domains !== undefined ? { domains: searchSettings.domains } : {}),
+        },
+        headers: { "X-API-Key": requireKey("you", key) },
+      })
+      const webResults = get(payload, "results.web")
+      const citations = isRecord(payload) ? payload.citations : undefined
+      const citedSources = Array.isArray(citations)
+        ? citations.flatMap((item) =>
+            isRecord(item) && typeof item.source === "string"
+              ? [
+                  {
+                    url: item.source,
+                    ...(Array.isArray(item.excerpts)
+                      ? { snippets: item.excerpts.filter((excerpt): excerpt is string => typeof excerpt === "string") }
+                      : {}),
+                  },
+                ]
+              : [],
+          )
+        : []
+      return answerResponse(
+        payload,
+        [...(Array.isArray(webResults) ? webResults : []), ...citedSources],
+        get(payload, "answer"),
+      )
+    }
+
     const extraction = isRecord(settings.extraction) ? settings.extraction : {}
     const payload = await apiJSON("https://ydc-index.io/v1/search", signal, {
       label: "you",
       body: {
         safesearch: "moderate",
-        ...settings,
+        ...searchSettings,
         extraction: {
           extraction_mode: "highlights",
           ...(globals.cacheWindowSeconds === 0 ? { extraction_mode: "full_page", extraction_source: "fetch" } : {}),

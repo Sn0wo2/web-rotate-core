@@ -1,4 +1,5 @@
 import { compact } from "es-toolkit/array"
+import { pick } from "es-toolkit/object"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import type { Globals } from "../../shared/config"
 import { stringValue } from "../../shared/config"
@@ -116,6 +117,31 @@ export function searchResponse(payload: unknown, results?: unknown, answer?: str
     results: normalizeResults(results === undefined ? payload : results),
     ...(resolvedAnswer ? { answer: resolvedAnswer } : {}),
     ...(metadata ? { metadata } : {}),
+  }
+}
+
+export function answerResponse(payload: unknown, results?: unknown, answer?: unknown): SearchResponse {
+  const value = answer ?? (isRecord(payload) ? payload.answer : undefined)
+  const sources = results ?? (isRecord(payload) ? (payload.sources ?? payload.citations ?? payload) : payload)
+  const response = searchResponse(
+    payload,
+    firstList(sources).map((source) => (typeof source === "string" ? { url: source } : source)),
+    value == null ? undefined : typeof value === "string" ? stringValue(value) : JSON.stringify(value),
+  )
+  const normalized = response.results.filter(({ url }) => {
+    try {
+      const parsed = new URL(url)
+      return parsed.protocol === "https:" || parsed.protocol === "http:"
+    } catch {
+      return false
+    }
+  })
+  if (!(normalized.length || response.answer))
+    throw new Error("answer response contained neither sources nor an answer")
+  return {
+    ...response,
+    results: normalized,
+    citations: normalized.map((result) => pick(result, ["url", "title"])),
   }
 }
 

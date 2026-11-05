@@ -1,17 +1,22 @@
+import { pick } from "es-toolkit/object"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
+import { stringValue } from "../../shared/config"
 import { checkedResponseText, timedSignal, USER_AGENT } from "../../shared/http"
 import { requireKey, scrapingbeeURL } from "../utils"
 import type { SearchProvider } from "./types"
-import { searchResponse } from "./utils"
+import { answerResponse, searchResponse } from "./utils"
 
 export const scrapingbee = {
   id: "scrapingbee",
   weight: 48,
   run: async ({ settings, key, queries, signal }) => {
-    const endpoint = scrapingbeeURL("/api/v1/store/google", {
-      search: queries[0],
-      ...settings,
-    })
+    const { api, ...options } = settings
+    const endpoint = scrapingbeeURL(
+      api === "answer" ? "/api/v1/chatgpt" : "/api/v1/store/google",
+      api === "answer"
+        ? { ...pick(options, ["add_html", "country_code", "tag"]), prompt: queries[0], search: true }
+        : { search: queries[0], ...options },
+    )
     const response = await fetch(endpoint, {
       headers: {
         Accept: "application/json",
@@ -28,10 +33,19 @@ export const scrapingbee = {
     } catch (error) {
       throw new Error("scrapingbee returned invalid JSON", { cause: error })
     }
-    const result = searchResponse(
-      payload,
-      isRecord(payload) && Array.isArray(payload.organic_results) ? payload.organic_results : payload,
-    )
+    const result =
+      api === "answer"
+        ? answerResponse(
+            payload,
+            isRecord(payload) ? payload.citations : [],
+            isRecord(payload)
+              ? (stringValue(payload.results_markdown) ?? stringValue(payload.results_text) ?? payload.results_json)
+              : undefined,
+          )
+        : searchResponse(
+            payload,
+            isRecord(payload) && Array.isArray(payload.organic_results) ? payload.organic_results : payload,
+          )
     const metadata = Object.fromEntries([...response.headers].filter(([name]) => name.startsWith("spb-")))
     return Object.keys(metadata).length ? { ...result, metadata: { ...result.metadata, ...metadata } } : result
   },
