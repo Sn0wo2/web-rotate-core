@@ -1,6 +1,6 @@
 {
   "name": "web-rotate-core",
-  "version": "0.4.0",
+  "version": "0.0.1",
   "description": "One Gateway for All WebSearch/WebFetch Providers!",
   "type": "module",
   "license": "Apache-2.0",
@@ -54,9 +54,9 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.4",
     "@types/bun": "^1.4.4",
     "@types/html-to-text": "^9.0.4",
-    "@biomejs/biome": "^2.6.4",
     "typescript": "^7.0.2"
   }
 }
