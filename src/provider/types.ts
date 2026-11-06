@@ -17,12 +17,43 @@ export type SettingsOf<P> = P extends { run: infer R }
     : Record<string, unknown>
   : Record<string, unknown>
 
+export type ProviderKey = {
+  key: string
+  tier?: string | undefined
+  weight?: number | undefined
+}
+
 export type ProviderEntry<Settings = Record<string, unknown>> = {
-  keys?: string | readonly string[] | undefined
+  keys?: string | readonly (string | ProviderKey)[] | undefined
   weight?: number | undefined
 } & Settings
 
 export type ProviderRoute<P extends Provider<unknown>> = P & {
   key: string | undefined
+  tier?: string | undefined
+  keyIndex?: number | undefined
   settings: Record<string, unknown>
+}
+
+export type AttemptDiagnostics = {
+  provider: string
+  keyless: boolean
+  keyIndex?: number | undefined
+  tier?: string | undefined
+  queries?: string[] | undefined
+  urls?: string[] | undefined
+  durationMs: number
+  ok: boolean
+  error?: string | undefined
+  cached?: boolean | undefined
+}
+
+export type ProviderUsage = {
+  provider: string
+  keyless: boolean
+  tier?: string | undefined
+  requests: number
+  results?: number | undefined
+  pages?: number | undefined
+  errors: number
 }

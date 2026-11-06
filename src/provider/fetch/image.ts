@@ -1,6 +1,7 @@
 import { fileTypeFromBuffer } from "file-type"
 import { readBodyLimited, TARGET_USER_AGENT } from "../../shared/http"
 import type { URLList } from "../../shared/types"
+import type { AttemptDiagnostics } from "../types"
 import type { FetchOutcome } from "./types"
 import { fetchManualRedirects } from "./utils"
 
@@ -24,9 +25,24 @@ export async function fetchImage(
   signal: AbortSignal,
   nativeEnabled: boolean,
   nativeOnly: boolean,
-): Promise<FetchOutcome | undefined> {
+): Promise<{ outcome?: FetchOutcome; attempts: AttemptDiagnostics[] }> {
   if (!nativeEnabled || urls.length !== 1 || !(nativeOnly || IMAGE_EXT.test(new URL(urls[0]).pathname)))
-    return undefined
+    return { attempts: [] }
+  const started = performance.now()
+  const failedAttempt = (error: string): { outcome?: FetchOutcome; attempts: AttemptDiagnostics[] } => {
+    return {
+      attempts: [
+        {
+          provider: "native",
+          keyless: true,
+          urls: [...urls],
+          durationMs: Math.round(performance.now() - started),
+          ok: false,
+          error,
+        },
+      ],
+    }
+  }
   try {
     const { response, url } = await fetchManualRedirects(
       urls[0],
@@ -43,16 +59,26 @@ export async function fetchImage(
       contentType === "image/vnd.fastbidsheet"
     ) {
       await response.body?.cancel()
-      return undefined
+      return failedAttempt(`response is not a supported image (content-type "${contentType || "unknown"}")`)
     }
     const body = await readBodyLimited(response, Math.floor((5 * 1024 * 1024 * 3) / 4), "native image")
     const mime = (await fileTypeFromBuffer(body))?.mime
-    if (!(mime && IMAGE_MIMES.has(mime))) return undefined
+    if (!(mime && IMAGE_MIMES.has(mime))) return failedAttempt("downloaded content is not a supported image")
     const base64 = body.toBase64()
-    if (base64.length > 5 * 1024 * 1024) return undefined
-    return { type: "image", url, mime, base64 }
+    if (base64.length > 5 * 1024 * 1024) return failedAttempt("image exceeds the 5 MB size limit")
+    const attempt: AttemptDiagnostics = {
+      provider: "native",
+      keyless: true,
+      urls: [...urls],
+      durationMs: Math.round(performance.now() - started),
+      ok: true,
+    }
+    return {
+      outcome: { type: "image", url, mime, base64, provider: "native", attempts: [attempt] },
+      attempts: [attempt],
+    }
   } catch (error) {
     if (signal.aborted) throw error
-    return undefined
+    return failedAttempt(error instanceof Error ? error.message : String(error))
   }
 }

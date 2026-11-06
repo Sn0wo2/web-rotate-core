@@ -28,8 +28,16 @@ export type {
   SearchResponse,
   SearchResult,
 } from "./provider/search/types"
-export type { Provider, ProviderEntry } from "./provider/types"
+export type {
+  AttemptDiagnostics,
+  Provider,
+  ProviderEntry,
+  ProviderKey,
+  ProviderUsage,
+} from "./provider/types"
 export type { Globals } from "./shared/config"
 export { globalsSchema, RotateConfigError } from "./shared/config"
 export { HTTPError } from "./shared/http"
+export type { LRUCacheOptions, LRUCacheSetOptions } from "./shared/lru"
+export { LRUCache } from "./shared/lru"
 export type { URLList } from "./shared/types"

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { LRUCache } from "./lru"
 
 export class RotateConfigError extends Error {
   constructor(
@@ -24,6 +25,7 @@ export function stringList(value: unknown): string[] {
 
 export const globalsSchema = z.object({
   cacheWindowSeconds: z.coerce.number().transform(Math.trunc).pipe(z.number().nonnegative()).catch(0),
+  cache: z.instanceof(LRUCache).optional(),
   cleanup: z.enum(["none", "defuddle"]).catch("none"),
   prefer: z.enum(["keyed", "keyless"]).catch("keyless"),
   concurrency: z.coerce.number().transform(Math.trunc).pipe(z.number().positive()).catch(4),

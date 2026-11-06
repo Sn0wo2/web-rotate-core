@@ -1,5 +1,41 @@
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import { HTTPError, REQUEST_TIMEOUT_MS, timedSignal } from "../shared/http"
+import type { AttemptDiagnostics, ProviderUsage } from "./types"
+
+export function routeAttempt(route: {
+  id: string
+  key: string | undefined
+  tier?: string | undefined
+  keyIndex?: number | undefined
+}): Pick<AttemptDiagnostics, "provider" | "keyless" | "tier" | "keyIndex"> {
+  return {
+    provider: route.id,
+    keyless: route.key === undefined,
+    ...(route.tier === undefined ? {} : { tier: route.tier }),
+    ...(route.keyIndex === undefined ? {} : { keyIndex: route.keyIndex }),
+  }
+}
+
+export function usageEntry(
+  usage: Map<string, ProviderUsage>,
+  route: { id: string; key: string | undefined; tier?: string | undefined },
+  init?: { results?: number | undefined; pages?: number | undefined },
+): ProviderUsage {
+  const bucket = `${route.id}\u0000${route.key === undefined ? "\u0000keyless" : (route.tier ?? "")}`
+  const existing = usage.get(bucket)
+  if (existing) return existing
+  const entry: ProviderUsage = {
+    provider: route.id,
+    keyless: route.key === undefined,
+    ...(route.key === undefined || route.tier === undefined ? {} : { tier: route.tier }),
+    requests: 0,
+    errors: 0,
+    ...(init?.results === undefined ? {} : { results: init.results }),
+    ...(init?.pages === undefined ? {} : { pages: init.pages }),
+  }
+  usage.set(bucket, entry)
+  return entry
+}
 
 export function requireKey(provider: string, key: string | undefined): string {
   if (!key) throw new Error(`${provider} API key is not configured`)

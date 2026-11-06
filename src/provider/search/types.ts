@@ -1,6 +1,6 @@
 import type { Globals } from "../../shared/config"
 import type { URLList } from "../../shared/types"
-import type { Provider, ProviderEntry, SettingsOf } from "../types"
+import type { AttemptDiagnostics, Provider, ProviderEntry, ProviderUsage, SettingsOf } from "../types"
 
 export type SearchResult = {
   url: string
@@ -27,7 +27,9 @@ export type SearchOutcome = {
     provider: string
     queries: string[]
   })[]
-  errors?: { query: string; error: string }[]
+  attempts?: AttemptDiagnostics[]
+  usage?: ProviderUsage[]
+  errors?: { query: string; error: string; provider: string }[]
 }
 
 export type SearchProvider<Settings = Record<string, unknown>> = Provider<Settings> & {

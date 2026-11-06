@@ -2,14 +2,17 @@ import { chunk, orderBy, uniq } from "es-toolkit/array"
 import { clamp } from "es-toolkit/math"
 import { globalsSchema, RotateConfigError } from "../../shared/config"
 import { HTTPError, timedSignal } from "../../shared/http"
+import type { LRUCache } from "../../shared/lru"
 import type { URLList } from "../../shared/types"
 import { mapConcurrent } from "../../shared/utils"
 import { providerRoutes, resolveProviderEntries } from "../rotation"
-import type { ProviderEntry } from "../types"
+import type { AttemptDiagnostics, ProviderEntry, ProviderUsage } from "../types"
+import { routeAttempt, usageEntry } from "../utils"
 import { SEARCH_PROVIDERS } from "./index"
 import type { SearchOutcome, SearchProvider, SearchProviderConfigBase, SearchResult } from "./types"
 
 export type SearchProviderConfig<P extends readonly SearchProvider[] = []> = {
+  cache?: LRUCache | undefined
   cacheWindowSeconds?: number | undefined
   providers?: (SearchProviderConfigBase<typeof SEARCH_PROVIDERS> & SearchProviderConfigBase<NoInfer<P>>) | undefined
   prefer?: "keyed" | "keyless" | undefined
@@ -76,23 +79,94 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
     throw new RotateConfigError("search queries must not be empty")
   const uniqueQueries = uniq(queries.map((query) => query.trim()))
   const maxResults = clamp(globals.searchResults, 1, 100)
+  const cache = globals.cache?.enabled ? globals.cache : undefined
+  const searchKey = (query: string) => `search:v1:${maxResults}:${query}`
   const candidates = orderBy(pool, ["weight"], ["desc"])
   const maxAttempts = Math.max(1, Math.min(globals.maxAttempts, candidates.length))
   const pending = new Set(uniqueQueries)
   const blocked = new Map<string, Error>()
-  const errors = new Map<string, string>()
+  const errors = new Map<string, { error: string; provider: string }>()
   const results = new Map<string, SearchResult>()
   const responses: SearchOutcome["responses"] = []
-  let attempts = 0
+  const attempts: AttemptDiagnostics[] = []
+  const usage = new Map<string, ProviderUsage>()
+  const absorb = (incoming: SearchResult) => {
+    const existing = results.get(incoming.url)
+    if (!existing) {
+      results.set(incoming.url, incoming)
+      return
+    }
+    const snippets = uniq([
+      ...(existing.snippets ?? []),
+      ...(incoming.snippets ?? []),
+      ...(existing.content && incoming.content && incoming.content !== existing.content ? [incoming.content] : []),
+    ])
+    const incomingQueries = incoming.queries ?? []
+    const prior = existing.metadata?.providerResults
+    results.set(incoming.url, {
+      ...incoming,
+      ...existing,
+      ...(existing.title || !incoming.title ? {} : { title: incoming.title }),
+      ...(existing.content || !incoming.content ? {} : { content: incoming.content }),
+      ...(snippets.length ? { snippets } : {}),
+      queries: uniq([...(existing.queries ?? []), ...incomingQueries]),
+      metadata: {
+        ...existing.metadata,
+        providerResults: [
+          ...(Array.isArray(prior)
+            ? prior
+            : [
+                {
+                  provider: existing.provider,
+                  queries: existing.queries,
+                  published: existing.published,
+                  updated: existing.updated,
+                  metadata: existing.metadata,
+                },
+              ]),
+          {
+            provider: incoming.provider,
+            queries: incoming.queries,
+            published: incoming.published,
+            updated: incoming.updated,
+            metadata: incoming.metadata,
+          },
+        ],
+      },
+    })
+  }
+  if (cache) {
+    const cachedQueries: string[] = []
+    for (const query of uniqueQueries) {
+      const cached = cache.get<SearchResult[]>(searchKey(query))
+      if (!cached) continue
+      pending.delete(query)
+      cachedQueries.push(query)
+      for (const item of cached) absorb(item)
+    }
+    if (cachedQueries.length)
+      attempts.push({ provider: "cache", keyless: true, queries: cachedQueries, durationMs: 0, ok: true, cached: true })
+  }
+  let routeTries = 0
   for (const route of candidates) {
-    if (!pending.size || attempts >= maxAttempts) break
-    if (blocked.has(route.id)) continue
-    attempts++
+    if (!pending.size || routeTries >= maxAttempts) break
+    if (blocked.has(route.id)) {
+      attempts.push({
+        ...routeAttempt(route),
+        queries: [...pending],
+        durationMs: 0,
+        ok: false,
+        error: "skipped: provider blocked after an invalid-request error",
+      })
+      continue
+    }
+    routeTries++
     const groups = chunk([...pending], Math.min(pending.size, route.batchSize ?? 1))
     const outcomes = await mapConcurrent(
       groups,
       async (group) => {
         signal.throwIfAborted()
+        const started = performance.now()
         try {
           const previousError = blocked.get(route.id)
           if (previousError) throw previousError
@@ -104,13 +178,14 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
             signal: timedSignal(signal),
             globals: { ...globals, searchResults: budget },
           })
-          return { group, response }
+          return { group, response, durationMs: Math.round(performance.now() - started) }
         } catch (error) {
           if (signal.aborted || error instanceof RotateConfigError) throw error
           if (error instanceof HTTPError && error.invalidRequest) blocked.set(route.id, error)
           return {
             group,
             error: error instanceof Error ? error.message : String(error),
+            durationMs: Math.round(performance.now() - started),
           }
         }
       },
@@ -119,12 +194,30 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
     )
     signal.throwIfAborted()
     for (const outcome of outcomes) {
+      const usageRecord = usageEntry(usage, route, { results: 0 })
       if (!outcome.response) {
         const error = outcome.error ?? "search provider failed"
-        for (const query of outcome.group) errors.set(query, error)
+        usageRecord.requests++
+        usageRecord.errors++
+        attempts.push({
+          ...routeAttempt(route),
+          queries: outcome.group,
+          durationMs: outcome.durationMs,
+          ok: false,
+          error,
+        })
+        for (const query of outcome.group) errors.set(query, { error, provider: route.id })
         continue
       }
+      usageRecord.requests++
+      attempts.push({
+        ...routeAttempt(route),
+        queries: outcome.group,
+        durationMs: outcome.durationMs,
+        ok: true,
+      })
       const { results: items, ...response } = outcome.response
+      usageRecord.results = (usageRecord.results ?? 0) + items.length
       responses.push({
         ...response,
         provider: route.id,
@@ -134,68 +227,37 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
         pending.delete(query)
         errors.delete(query)
       }
-      for (const item of items) {
-        const incoming = {
+      const attributed = items.map((item) => {
+        return {
           ...item,
           provider: item.provider ?? route.id,
           queries: item.queries ?? outcome.group,
         }
-        const existing = results.get(item.url)
-        if (!existing) {
-          results.set(item.url, incoming)
-          continue
+      })
+      for (const item of attributed) absorb(item)
+      if (cache)
+        for (const query of outcome.group) {
+          const cached = attributed.filter((item) => item.queries.includes(query))
+          if (cached.length) cache.set(searchKey(query), cached, { ttlSeconds: globals.cacheWindowSeconds })
         }
-        const snippets = uniq([
-          ...(existing.snippets ?? []),
-          ...(incoming.snippets ?? []),
-          ...(existing.content && incoming.content && incoming.content !== existing.content ? [incoming.content] : []),
-        ])
-        const prior = existing.metadata?.providerResults
-        results.set(item.url, {
-          ...incoming,
-          ...existing,
-          ...(existing.title || !incoming.title ? {} : { title: incoming.title }),
-          ...(existing.content || !incoming.content ? {} : { content: incoming.content }),
-          ...(snippets.length ? { snippets } : {}),
-          queries: uniq([...(existing.queries ?? []), ...incoming.queries]),
-          metadata: {
-            ...existing.metadata,
-            providerResults: [
-              ...(Array.isArray(prior)
-                ? prior
-                : [
-                    {
-                      provider: existing.provider,
-                      queries: existing.queries,
-                      published: existing.published,
-                      updated: existing.updated,
-                      metadata: existing.metadata,
-                    },
-                  ]),
-              {
-                provider: incoming.provider,
-                queries: incoming.queries,
-                published: incoming.published,
-                updated: incoming.updated,
-                metadata: incoming.metadata,
-              },
-            ],
-          },
-        })
-      }
     }
   }
-  if (!responses.length)
-    throw new Error(
-      `all ${attempts} attempt(s) failed. Last error: ${[...errors.values()].at(-1) ?? "no usable provider route"}`,
+  if (!(responses.length || results.size))
+    throw Object.assign(
+      new Error(
+        `all ${routeTries} attempt(s) failed. Last error: ${[...errors.values()].at(-1)?.error ?? "no usable provider route"}`,
+      ),
+      { attempts },
     )
   return {
     results: [...results.values()].slice(0, maxResults),
     responses,
+    ...(attempts.length ? { attempts } : {}),
+    ...(usage.size ? { usage: [...usage.values()] } : {}),
     ...(errors.size
       ? {
-          errors: [...errors].map(([query, error]) => {
-            return { query, error }
+          errors: [...errors].map(([query, failure]) => {
+            return { query, error: failure.error, provider: failure.provider }
           }),
         }
       : {}),

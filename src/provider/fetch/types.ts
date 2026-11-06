@@ -1,6 +1,6 @@
 import type { Globals } from "../../shared/config"
 import type { URLList } from "../../shared/types"
-import type { Provider, ProviderEntry, SettingsOf } from "../types"
+import type { AttemptDiagnostics, Provider, ProviderEntry, ProviderUsage, SettingsOf } from "../types"
 
 export type FetchFormat = "text" | "markdown" | "html"
 
@@ -16,8 +16,8 @@ export type FetchPage = {
 }
 
 export type FetchOutcome =
-  | { type: "image"; url: string; mime: string; base64: string }
-  | { type: "pages"; pages: FetchPage[] }
+  | { type: "image"; url: string; mime: string; base64: string; provider: string; attempts?: AttemptDiagnostics[] }
+  | { type: "pages"; pages: FetchPage[]; attempts?: AttemptDiagnostics[]; usage?: ProviderUsage[] }
 
 export type FetchProvider<Settings = Record<string, unknown>> = Provider<Settings> & {
   formats: readonly FetchFormat[]
