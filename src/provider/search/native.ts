@@ -2,7 +2,7 @@ import { search as duckDuckGoSearchAPI, SafeSearchType } from "duck-duck-scrape"
 import { clamp } from "es-toolkit/math"
 import { XMLParser } from "fast-xml-parser"
 import { search as googleSearchAPI, OrganicResult } from "google-sr"
-import { HTTPError, timedSignal } from "../../shared/http"
+import { checkedResponseText, HTTPError, timedSignal } from "../../shared/http"
 import { mapConcurrent } from "../../shared/utils"
 import type { SearchProvider, SearchResult } from "./types"
 
@@ -11,91 +11,82 @@ const SERP_USER_AGENT =
 
 const xmlParser = new XMLParser({ ignoreAttributes: true })
 
-const SERP_ENGINES: {
-  search: (query: string, count: number, signal: AbortSignal) => Promise<SearchResult[]>
-}[] = [
-  {
-    search: async (query, count, signal) => {
-      const results = await googleSearchAPI({
-        query,
-        parsers: [OrganicResult],
-        noPartialResults: true,
-        requestConfig: { signal: timedSignal(signal) },
-      })
-      return results.slice(0, count).flatMap((result) =>
-        result.link
-          ? [
-              {
-                url: result.link,
-                ...(result.title ? { title: result.title } : {}),
-                ...(result.description ? { snippets: [result.description] } : {}),
-                provider: "google-serp",
-                queries: [query],
-              },
-            ]
-          : [],
-      )
-    },
+const SERP_ENGINES: ((query: string, count: number, signal: AbortSignal) => Promise<SearchResult[]>)[] = [
+  async (query, count, signal) => {
+    const results = await googleSearchAPI({
+      query,
+      parsers: [OrganicResult],
+      noPartialResults: true,
+      requestConfig: { signal: timedSignal(signal) },
+    })
+    return results.slice(0, count).flatMap((result) =>
+      result.link
+        ? [
+            {
+              url: result.link,
+              ...(result.title ? { title: result.title } : {}),
+              ...(result.description ? { snippets: [result.description] } : {}),
+              provider: "google-serp",
+              queries: [query],
+            },
+          ]
+        : [],
+    )
   },
-  {
-    search: async (query, count, signal) => {
-      const url = new URL("https://www.bing.com/search")
-      url.searchParams.set("q", query)
-      url.searchParams.set("format", "rss")
-      url.searchParams.set("count", String(Math.min(Math.max(count, 1), 30)))
-      url.searchParams.set("mkt", "en-US")
-      const response = await fetch(url, {
-        headers: {
-          Accept: "application/rss+xml, application/xml, text/xml",
-          "User-Agent": SERP_USER_AGENT,
-        },
-        signal: timedSignal(signal),
-      })
-      const channel = xmlParser.parse(await response.text())?.rss?.channel
-      const items: {
-        link?: string
-        title?: string
-        description?: string
-      }[] = Array.isArray(channel?.item) ? channel.item : channel?.item ? [channel.item] : []
-      if (!(response.ok && items.length))
-        throw new HTTPError(response.status, `bing rss returned ${response.status} with no items`)
-      return items.slice(0, count).flatMap((item) =>
-        item.link
-          ? [
-              {
-                url: item.link,
-                ...(item.title ? { title: item.title } : {}),
-                ...(item.description ? { snippets: [item.description] } : {}),
-                provider: "bing-serp",
-                queries: [query],
-              },
-            ]
-          : [],
-      )
-    },
+  async (query, count, signal) => {
+    const url = new URL("https://www.bing.com/search")
+    url.searchParams.set("q", query)
+    url.searchParams.set("format", "rss")
+    url.searchParams.set("count", String(clamp(count, 1, 30)))
+    url.searchParams.set("mkt", "en-US")
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/rss+xml, application/xml, text/xml",
+        "User-Agent": SERP_USER_AGENT,
+      },
+      signal: timedSignal(signal),
+    })
+    const channel = xmlParser.parse(await checkedResponseText(response, "bing rss"))?.rss?.channel
+    const items: {
+      link?: string
+      title?: string
+      description?: string
+    }[] = Array.isArray(channel?.item) ? channel.item : channel?.item ? [channel.item] : []
+    if (!items.length) throw new HTTPError(response.status, `bing rss returned ${response.status} with no items`)
+    return items.slice(0, count).flatMap((item) =>
+      item.link
+        ? [
+            {
+              url: item.link,
+              ...(item.title ? { title: item.title } : {}),
+              ...(item.description ? { snippets: [item.description] } : {}),
+              provider: "bing-serp",
+              queries: [query],
+            },
+          ]
+        : [],
+    )
   },
-  {
-    search: async (query, count) => {
-      const results = await duckDuckGoSearchAPI(
-        query,
-        { safeSearch: SafeSearchType.OFF },
-        {
-          headers: { "User-Agent": SERP_USER_AGENT },
-          timeout: 30_000,
-          response_timeout: 30_000,
-          use_proxy_from_env_var: false,
-        },
-      )
-      return results.results.slice(0, count).map((result) => {
-        return {
-          url: result.url,
-          ...(result.title ? { title: result.title } : {}),
-          ...(result.description ? { snippets: [result.description] } : {}),
-          provider: "duckduckgo-serp",
-          queries: [query],
-        }
-      })
-    },
+  async (query, count) => {
+    const results = await duckDuckGoSearchAPI(
+      query,
+      { safeSearch: SafeSearchType.OFF },
+      {
+        headers: { "User-Agent": SERP_USER_AGENT },
+        timeout: 30_000,
+        response_timeout: 30_000,
+        use_proxy_from_env_var: false,
+      },
+    )
+    return results.results.slice(0, count).map((result) => {
+      return {
+        url: result.url,
+        ...(result.title ? { title: result.title } : {}),
+        ...(result.description ? { snippets: [result.description] } : {}),
+        provider: "duckduckgo-serp",
+        queries: [query],
+      }
+    })
   },
 ]
 
@@ -108,9 +99,9 @@ export const native = {
     const groups = await mapConcurrent(
       queries,
       async (query): Promise<SearchResult[]> => {
-        for (const engine of SERP_ENGINES) {
+        for (const search of SERP_ENGINES) {
           try {
-            const parsed = await engine.search(query, count, signal)
+            const parsed = await search(query, count, signal)
             if (parsed.length) return parsed
           } catch (error) {
             if (signal.aborted) throw error

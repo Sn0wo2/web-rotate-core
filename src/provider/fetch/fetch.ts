@@ -36,6 +36,10 @@ export const DEFAULT_FETCH_PROVIDER_CONFIG: DefaultFetchProviderConfig = {
     firecrawl: {},
     tinyfish: {},
     jina: {},
+    keenable: {},
+    nimble: {},
+    octen: {},
+    serper: {},
     scrapingant: {},
     scrapingbee: {},
     scrapfly: {},
@@ -45,6 +49,9 @@ export const DEFAULT_FETCH_PROVIDER_CONFIG: DefaultFetchProviderConfig = {
     linkup: {},
     deepseek: {},
     bocha: {},
+    doubao: {},
+    claude: {},
+    gemini: {},
     native: {},
     zhipu: {},
   },
@@ -86,8 +93,6 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
   if (imageOutcome) return imageOutcome
 
   const cache = globals.cache?.enabled ? globals.cache : undefined
-  const fetchKey = (url: string) => `fetch:v1:${globals.cleanup}:${format}:${url}`
-
   const candidates = orderBy(
     pool.filter((route) => format !== "html" || route.formats.includes("html")),
     ["weight"],
@@ -104,7 +109,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
     const cachedURLs: string[] = []
     const uncachedURLs: string[] = []
     for (const url of pendingURLs) {
-      const page = cache.get<FetchPage>(fetchKey(url))
+      const page = cache.get<FetchPage>(`fetch:v1:${globals.cleanup}:${format}:${url}`)
       if (page?.content) {
         pagesByURL.set(url, page)
         cachedURLs.push(url)
@@ -114,7 +119,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
     if (cachedURLs.length)
       attempts.push({ provider: "cache", keyless: true, urls: cachedURLs, durationMs: 0, ok: true, cached: true })
   }
-  const maxAttempts = Math.max(1, Math.min(globals.maxAttempts, candidates.length))
+  const maxAttempts = Math.min(globals.maxAttempts, candidates.length)
   let routeTries = 0
   for (const route of candidates) {
     if (!pendingURLs.length || routeTries >= maxAttempts) break
@@ -135,6 +140,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
     for (const url of pendingURLs) providerByURL.set(url, route.id)
     const usageRecord = usageEntry(usage, route, { pages: 0 })
     const started = performance.now()
+    usageRecord.requests++
     try {
       const nativeFormat =
         globals.cleanup !== "none" && route.formats.includes("html")
@@ -154,14 +160,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
         format: nativeFormat,
         globals,
       })
-      usageRecord.requests++
       usageRecord.pages = (usageRecord.pages ?? 0) + routePages.length
-      attempts.push({
-        ...routeAttempt(route),
-        urls: [...pendingURLs],
-        durationMs: Math.round(performance.now() - started),
-        ok: true,
-      })
       signal.throwIfAborted()
       const convertedPages = await mapConcurrent(
         routePages,
@@ -210,17 +209,22 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
         if (page?.content) {
           pagesByURL.set(url, page)
           errorsByURL.delete(url)
-          cache?.set(fetchKey(url), page, { ttlSeconds: globals.cacheWindowSeconds })
+          cache?.set(`fetch:v1:${globals.cleanup}:${format}:${url}`, page, { ttlSeconds: globals.cacheWindowSeconds })
         } else {
           if (page?.error) errorsByURL.set(url, page.error)
           nextURLs.push(url)
         }
       }
+      attempts.push({
+        ...routeAttempt(route),
+        urls: [...pendingURLs],
+        durationMs: Math.round(performance.now() - started),
+        ok: true,
+      })
       pendingURLs = nextURLs
     } catch (error) {
       if (signal.aborted || error instanceof RotateConfigError) throw error
       const message = error instanceof Error ? error.message : String(error)
-      usageRecord.requests++
       usageRecord.errors++
       attempts.push({
         ...routeAttempt(route),

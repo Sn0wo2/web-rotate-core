@@ -4,7 +4,7 @@ import { restSearch } from "./utils"
 
 export const nimble = {
   id: "nimble",
-  weight: 72,
+  weight: 74,
   run: restSearch<Record<string, unknown>>(
     "https://sdk.nimbleway.com/v2/search",
     ({ settings, queries, globals }) => {

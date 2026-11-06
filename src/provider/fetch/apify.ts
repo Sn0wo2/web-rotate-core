@@ -10,7 +10,7 @@ const TRAILING_SLASHES = /\/+$/
 
 export const apify = {
   id: "apify",
-  weight: 65,
+  weight: 79,
   formats: ["html", "markdown", "text"],
   options: settingsSchema,
   run: async ({ settings, key, urls, signal, format }) => {

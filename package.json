@@ -30,10 +30,15 @@
     "release:dry": "goreleaser release --clean --snapshot"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.97",
+    "@ai-sdk/google": "^4.0.112",
+    "@ai-sdk/openai": "^4.0.109",
+    "@ai-sdk/xai": "^5.0.39",
     "@hyperbrowser/sdk": "^1.4.1",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@truto/turndown-plugin-gfm": "^1.0.7",
     "@types/turndown": "^5.0.6",
+    "ai": "^7.0.163",
     "defuddle": "~0.19.6",
     "duck-duck-scrape": "^2.2.7",
     "es-toolkit": "^1.53.1",

@@ -9,7 +9,7 @@ type BrightdataSettings = z.output<typeof settingsSchema>
 
 export const brightdata = {
   id: "brightdata",
-  weight: 62,
+  weight: 75,
   formats: ["html", "markdown"],
   options: settingsSchema,
   run: fetchOne<BrightdataSettings>(async ({ settings, key, url, signal, format }) => {

@@ -8,6 +8,13 @@ import { mapConcurrent } from "../../shared/utils"
 import { firstList, responseMetadata } from "../utils"
 import type { FetchFormat, FetchPage, FetchProvider } from "./types"
 
+export function normalizeFetchURL(value: string) {
+  const url = URL.parse(value)
+  if (!url || (url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return undefined
+  url.hash = ""
+  return url.href
+}
+
 export function providerResult(content: unknown, format: FetchFormat, metadata?: Record<string, unknown>) {
   if (typeof content !== "string" || !content.trim()) throw new Error("provider returned empty content")
   return { content, format, ...(metadata ? { metadata } : {}) }
@@ -90,19 +97,11 @@ export async function fetchBatches(
         return await run(batch)
       } catch (error) {
         if (signal.aborted) throw error
+        const message = error instanceof Error ? error.message : String(error)
+        const metadata =
+          error instanceof HTTPError ? { httpStatus: error.status, retryable: error.retryable } : undefined
         return batch.map((url) => {
-          return {
-            url,
-            error: error instanceof Error ? error.message : String(error),
-            ...(error instanceof HTTPError
-              ? {
-                  metadata: {
-                    httpStatus: error.status,
-                    retryable: error.retryable,
-                  },
-                }
-              : {}),
-          }
+          return { url, error: message, ...(metadata ? { metadata: { ...metadata } } : {}) }
         })
       }
     },
@@ -167,59 +166,51 @@ export function fetchOne<S>(
 ): FetchProvider<S>["run"] {
   return async ({ settings, key, urls, signal, format, globals }) => {
     const results = new Array<FetchPage | undefined>(urls.length)
-    const stop = new AbortController()
-    try {
-      await mapConcurrent(
-        urls,
-        async (url, index) => {
-          if (stop.signal.aborted) return
-          const requestSignal = timedSignal(signal)
-          try {
-            results[index] = {
+    let stopped = false
+    await mapConcurrent(
+      urls,
+      async (url, index) => {
+        if (stopped) return
+        const requestSignal = timedSignal(signal)
+        try {
+          results[index] = {
+            url,
+            ...(await run({
+              settings,
+              key,
               url,
-              ...(await run({
-                settings,
-                key,
-                url,
-                signal: requestSignal,
-                format,
-                globals,
-              })),
-            }
-          } catch (error) {
-            if (error instanceof HTTPError) {
-              results[index] = {
-                url,
-                error: error.message,
-                metadata: {
-                  httpStatus: error.status,
-                  retryable: error.retryable,
-                },
-              }
-              if (!error.retryable) stop.abort()
-              return
-            }
-            if (error instanceof Error && error.name === "TimeoutError" && !signal.aborted) {
-              results[index] = { url, error: error.message }
-              return
-            }
-            results[index] = {
-              url,
-              error: error instanceof Error ? error.message : String(error),
-            }
+              signal: requestSignal,
+              format,
+              globals,
+            })),
           }
-        },
-        clamp(globals.concurrency, 1, 16),
-        signal,
-      )
-    } catch (error) {
-      if (signal.aborted || !(error instanceof Error && error.name === "AbortError")) throw error
-    }
+        } catch (error) {
+          if (error instanceof HTTPError) {
+            results[index] = {
+              url,
+              error: error.message,
+              metadata: {
+                httpStatus: error.status,
+                retryable: error.retryable,
+              },
+            }
+            if (!error.retryable) stopped = true
+            return
+          }
+          results[index] = {
+            url,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        }
+      },
+      clamp(globals.concurrency, 1, 16),
+      signal,
+    )
     return urls.map(
       (url, index) =>
         results[index] ?? {
           url,
-          error: stop.signal.aborted ? "skipped after a non-retryable HTTP error" : "request did not complete",
+          error: stopped ? "skipped after a non-retryable HTTP error" : "request did not complete",
         },
     )
   }

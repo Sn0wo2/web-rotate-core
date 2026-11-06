@@ -8,7 +8,7 @@ import { answerResponse, searchResponse } from "./utils"
 
 export const octen = {
   id: "octen",
-  weight: 80,
+  weight: 77,
   run: async ({ settings, key, queries, signal, globals }) => {
     const { api, ...searchSettings } = settings
     if (api === "answer") {

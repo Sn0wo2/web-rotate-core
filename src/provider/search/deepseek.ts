@@ -14,7 +14,7 @@ type DeepSeekSearchSettings = z.output<typeof settingsSchema>
 
 export const deepseek = {
   id: "deepseek",
-  weight: 55,
+  weight: 69,
   options: settingsSchema,
   run: restSearch<DeepSeekSearchSettings>(
     "https://api.deepseek.com/v1/tools/search",

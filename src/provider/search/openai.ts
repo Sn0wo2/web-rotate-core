@@ -1,115 +1,115 @@
+import { createOpenAI } from "@ai-sdk/openai"
+import { generateText } from "ai"
 import { clamp } from "es-toolkit/math"
+import { omit } from "es-toolkit/object"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import { z } from "zod"
-import { stringValue } from "../../shared/config"
-import { apiJSON } from "../../shared/http"
-import { requireKey } from "../utils"
-import type { SearchProvider, SearchResponse, SearchResult } from "./types"
-import { searchResponse } from "./utils"
+import { modelCallOptions, modelProviderOptions, modelSettingsSchema } from "../ai"
+import { requireKey, sdkRequest } from "../utils"
+import type { SearchProvider } from "./types"
+import { modelSearchResponse, searchInstructions } from "./utils"
 
-const settingsSchema = z.looseObject({
+const settingsSchema = modelSettingsSchema.extend({
   api: z.enum(["search", "answer"]).optional(),
-  model: z.string().optional(),
-  instructions: z.string().optional(),
-  max_output_tokens: z.number().optional(),
-  reasoning: z.record(z.string(), z.unknown()).optional(),
+  reasoning: z.object({ effort: z.string().optional(), summary: z.string().optional() }).optional(),
   search_context_size: z.enum(["low", "medium", "high"]).optional(),
-  filters: z.record(z.string(), z.unknown()).optional(),
-  user_location: z.record(z.string(), z.unknown()).optional(),
+  filters: z
+    .object({
+      allowed_domains: z.array(z.string()).max(100).optional(),
+      blocked_domains: z.array(z.string()).max(100).optional(),
+    })
+    .optional(),
+  user_location: z
+    .object({
+      type: z.literal("approximate").optional(),
+      country: z.string().optional(),
+      city: z.string().optional(),
+      region: z.string().optional(),
+      timezone: z.string().optional(),
+    })
+    .optional(),
   external_web_access: z.boolean().optional(),
-  return_token_budget: z.number().optional(),
+  return_token_budget: z.enum(["default", "unlimited"]).optional(),
 })
-type OpenAISearchSettings = z.output<typeof settingsSchema>
 
 export const openai = {
   id: "openai",
-  weight: 66,
+  weight: 74,
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
-    const {
-      api,
-      model,
-      instructions,
-      max_output_tokens,
-      reasoning,
-      search_context_size,
-      filters,
-      user_location,
-      external_web_access,
-      return_token_budget,
-      ...rest
-    } = settings
-    const selectedModel = model?.trim() || "gpt-5-mini"
-    const payload = await apiJSON("https://api.openai.com/v1/responses", signal, {
-      key: requireKey("openai", key),
-      body: {
-        model: selectedModel,
-        instructions:
-          instructions?.trim() ||
-          (api === "answer"
-            ? "Search the web and answer the question using reliable sources. Include inline citations for factual claims."
-            : `Search the web. Return at most ${clamp(globals.searchResults, 1, 100)} concise factual snippets, one per line with an inline citation. Do not write a long-form answer.`),
-        max_output_tokens: max_output_tokens ?? 2048,
-        ...(reasoning ? { reasoning } : selectedModel === "gpt-5-mini" ? { reasoning: { effort: "low" } } : {}),
-        max_tool_calls: 1,
-        store: false,
-        ...rest,
-        tool_choice: "required",
-        include: ["web_search_call.action.sources"],
-        tools: [
-          {
-            type: "web_search",
-            search_context_size: search_context_size ?? "medium",
-            ...(filters ? { filters } : {}),
-            ...(user_location ? { user_location } : {}),
-            ...(external_web_access != null
-              ? { external_web_access }
-              : globals.cacheWindowSeconds === 0
-                ? { external_web_access: true }
-                : {}),
-            ...(return_token_budget != null ? { return_token_budget } : {}),
-          },
-        ],
-        input: queries[0],
-      },
+    const { filters, user_location, reasoning, return_token_budget } = settings
+    const client = createOpenAI({
+      apiKey: requireKey("openai", key),
+      ...(settings.baseUrl ? { baseURL: settings.baseUrl } : {}),
+      ...(return_token_budget
+        ? {
+            fetch: Object.assign(
+              (input: RequestInfo | URL, init?: RequestInit) => {
+                const body: unknown = JSON.parse(String(init?.body))
+                if (!(isRecord(body) && Array.isArray(body.tools))) throw new Error("invalid OpenAI SDK search request")
+                body.tools = body.tools.map((tool) =>
+                  isRecord(tool) && tool.type === "web_search" ? { ...tool, return_token_budget } : tool,
+                )
+                return fetch(input, { ...init, body: JSON.stringify(body) })
+              },
+              { preconnect: fetch.preconnect },
+            ),
+          }
+        : {}),
     })
-    const output: unknown[] = isRecord(payload) && Array.isArray(payload.output) ? payload.output : []
-    let answer = ""
-    const citations: NonNullable<SearchResponse["citations"]> = []
-    const results = new Map<string, SearchResult>()
-    for (const item of output) {
-      if (!isRecord(item) || item.type !== "message" || !Array.isArray(item.content)) continue
-      for (const part of item.content) {
-        if (!isRecord(part) || typeof part.text !== "string") continue
-        answer = answer ? `${answer}\n${part.text}` : part.text
-        for (const annotation of Array.isArray(part.annotations) ? part.annotations : []) {
-          if (!isRecord(annotation) || annotation.type !== "url_citation") continue
-          const url = stringValue(annotation.url)
-          if (!url) continue
-          const title = stringValue(annotation.title)
-          citations.push({
-            url,
-            ...(title ? { title } : {}),
-            ...(typeof annotation.start_index === "number" ? { start: annotation.start_index } : {}),
-            ...(typeof annotation.end_index === "number" ? { end: annotation.end_index } : {}),
-          })
-          const existing = results.get(url)
-          if (!existing) results.set(url, title ? { url, title } : { url })
-          else if (title && !existing.title) results.set(url, { ...existing, title })
-        }
-      }
-    }
-    for (const item of output) {
-      if (!isRecord(item) || item.type !== "web_search_call") continue
-      const action = isRecord(item.action) ? item.action : undefined
-      for (const source of Array.isArray(action?.sources) ? action.sources : []) {
-        const url = stringValue(isRecord(source) ? source.url : undefined)
-        if (url && !results.has(url)) results.set(url, { url })
-      }
-    }
-    return {
-      ...searchResponse(payload, [...results.values()], answer || undefined),
-      ...(citations.length ? { citations } : {}),
-    }
+    const selectedModel = settings.model?.trim() || "gpt-5-mini"
+    const result = await sdkRequest(signal, (abortSignal) =>
+      generateText({
+        ...modelCallOptions(settings),
+        model: client.responses(selectedModel),
+        system: searchInstructions(settings, clamp(globals.searchResults, 1, 100)),
+        prompt: queries[0],
+        tools: {
+          web_search: client.tools.webSearch({
+            searchContextSize: settings.search_context_size ?? "medium",
+            ...(filters
+              ? {
+                  filters: {
+                    ...(filters.allowed_domains ? { allowedDomains: filters.allowed_domains } : {}),
+                    ...(filters.blocked_domains ? { blockedDomains: filters.blocked_domains } : {}),
+                  },
+                }
+              : {}),
+            ...(user_location
+              ? {
+                  userLocation: {
+                    type: "approximate",
+                    ...(user_location.country ? { country: user_location.country } : {}),
+                    ...(user_location.city ? { city: user_location.city } : {}),
+                    ...(user_location.region ? { region: user_location.region } : {}),
+                    ...(user_location.timezone ? { timezone: user_location.timezone } : {}),
+                  },
+                }
+              : {}),
+            ...(settings.external_web_access == null ? {} : { externalWebAccess: settings.external_web_access }),
+          }),
+        },
+        toolChoice: "required",
+        providerOptions: {
+          openai: {
+            maxToolCalls: 1,
+            store: false,
+            ...(reasoning
+              ? {
+                  ...(reasoning.effort ? { reasoningEffort: reasoning.effort } : {}),
+                  ...(reasoning.summary ? { reasoningSummary: reasoning.summary } : {}),
+                }
+              : selectedModel === "gpt-5-mini"
+                ? { reasoningEffort: "low" }
+                : {}),
+            ...modelProviderOptions(omit(settings, Object.keys(settingsSchema.shape))),
+            ...settings.providerOptions,
+            includeWebSearchSources: true,
+          },
+        },
+        abortSignal,
+      }),
+    )
+    return modelSearchResponse(result)
   },
-} satisfies SearchProvider<OpenAISearchSettings>
+} satisfies SearchProvider<z.output<typeof settingsSchema>>

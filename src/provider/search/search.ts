@@ -44,10 +44,14 @@ export const DEFAULT_SEARCH_PROVIDER_CONFIG: DefaultSearchProviderConfig = {
     scrapingbee: {},
     diffbot: {},
     brightdata: {},
+    apify: {},
     linkup: {},
     doubao: {},
     deepseek: {},
     openai: {},
+    grok: {},
+    claude: {},
+    gemini: {},
     native: {},
     zhipu: {},
   },
@@ -80,9 +84,8 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
   const uniqueQueries = uniq(queries.map((query) => query.trim()))
   const maxResults = clamp(globals.searchResults, 1, 100)
   const cache = globals.cache?.enabled ? globals.cache : undefined
-  const searchKey = (query: string) => `search:v1:${maxResults}:${query}`
   const candidates = orderBy(pool, ["weight"], ["desc"])
-  const maxAttempts = Math.max(1, Math.min(globals.maxAttempts, candidates.length))
+  const maxAttempts = Math.min(globals.maxAttempts, candidates.length)
   const pending = new Set(uniqueQueries)
   const blocked = new Map<string, Error>()
   const errors = new Map<string, { error: string; provider: string }>()
@@ -138,7 +141,7 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
   if (cache) {
     const cachedQueries: string[] = []
     for (const query of uniqueQueries) {
-      const cached = cache.get<SearchResult[]>(searchKey(query))
+      const cached = cache.get<SearchResult[]>(`search:v1:${maxResults}:${query}`)
       if (!cached) continue
       pending.delete(query)
       cachedQueries.push(query)
@@ -166,10 +169,10 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
       groups,
       async (group) => {
         signal.throwIfAborted()
+        const previousError = blocked.get(route.id)
+        if (previousError) return { group, error: previousError.message, durationMs: 0, skipped: true }
         const started = performance.now()
         try {
-          const previousError = blocked.get(route.id)
-          if (previousError) throw previousError
           const budget = Math.max(1, Math.ceil(maxResults / uniqueQueries.length)) * group.length
           const response = await route.run({
             settings: route.settings,
@@ -193,23 +196,22 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
       signal,
     )
     signal.throwIfAborted()
+    const usageRecord = usageEntry(usage, route, { results: 0 })
     for (const outcome of outcomes) {
-      const usageRecord = usageEntry(usage, route, { results: 0 })
+      if (!outcome.skipped) usageRecord.requests++
       if (!outcome.response) {
         const error = outcome.error ?? "search provider failed"
-        usageRecord.requests++
-        usageRecord.errors++
+        if (!outcome.skipped) usageRecord.errors++
         attempts.push({
           ...routeAttempt(route),
           queries: outcome.group,
           durationMs: outcome.durationMs,
           ok: false,
-          error,
+          error: outcome.skipped ? "skipped: provider blocked after an invalid-request error" : error,
         })
         for (const query of outcome.group) errors.set(query, { error, provider: route.id })
         continue
       }
-      usageRecord.requests++
       attempts.push({
         ...routeAttempt(route),
         queries: outcome.group,
@@ -238,11 +240,12 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
       if (cache)
         for (const query of outcome.group) {
           const cached = attributed.filter((item) => item.queries.includes(query))
-          if (cached.length) cache.set(searchKey(query), cached, { ttlSeconds: globals.cacheWindowSeconds })
+          if (cached.length || !(response.answer || response.citations?.length))
+            cache.set(`search:v1:${maxResults}:${query}`, cached, { ttlSeconds: globals.cacheWindowSeconds })
         }
     }
   }
-  if (!(responses.length || results.size))
+  if (pending.size === uniqueQueries.length)
     throw Object.assign(
       new Error(
         `all ${routeTries} attempt(s) failed. Last error: ${[...errors.values()].at(-1)?.error ?? "no usable provider route"}`,

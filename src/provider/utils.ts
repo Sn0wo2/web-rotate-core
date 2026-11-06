@@ -21,13 +21,13 @@ export function usageEntry(
   route: { id: string; key: string | undefined; tier?: string | undefined },
   init?: { results?: number | undefined; pages?: number | undefined },
 ): ProviderUsage {
-  const bucket = `${route.id}\u0000${route.key === undefined ? "\u0000keyless" : (route.tier ?? "")}`
+  const bucket = `${route.id}\u0000${route.key === undefined ? "\u0000keyless" : "\u0000keyed"}\u0000${route.tier ?? ""}`
   const existing = usage.get(bucket)
   if (existing) return existing
   const entry: ProviderUsage = {
     provider: route.id,
     keyless: route.key === undefined,
-    ...(route.key === undefined || route.tier === undefined ? {} : { tier: route.tier }),
+    ...(route.tier === undefined ? {} : { tier: route.tier }),
     requests: 0,
     errors: 0,
     ...(init?.results === undefined ? {} : { results: init.results }),
@@ -118,9 +118,7 @@ export function scrapingbeeURL(path: string, params: Record<string, unknown>): U
     } else {
       urlParams(endpoint, { [name]: value }, (parameter, item) => {
         if (parameter === "js_snippet" && typeof item === "string") {
-          let binary = ""
-          for (const byte of new TextEncoder().encode(item)) binary += String.fromCharCode(byte)
-          return btoa(binary)
+          return new TextEncoder().encode(item).toBase64()
         }
         return undefined
       })
@@ -135,23 +133,28 @@ export async function sdkRequest<T>(
   timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const gate = timedSignal(signal, timeoutMs)
+  let onAbort: (() => void) | undefined
   try {
+    gate.throwIfAborted()
     return await Promise.race([
-      run(gate),
       new Promise<never>((_, reject) => {
-        if (gate.aborted) reject(gate.reason)
-        else
-          gate.addEventListener("abort", () => reject(gate.reason), {
-            once: true,
-          })
+        onAbort = () => reject(gate.reason)
+        gate.addEventListener("abort", onAbort, { once: true })
+      }),
+      Promise.resolve().then(() => {
+        gate.throwIfAborted()
+        return run(gate)
       }),
     ])
   } catch (error) {
-    const status = (error as { status?: unknown } | null)?.status
+    const failure = error as { status?: unknown; statusCode?: unknown } | null
+    const status = failure?.status ?? failure?.statusCode
     if (typeof status === "number" && status >= 400)
       throw Object.assign(new HTTPError(status, error instanceof Error ? error.message : String(error)), {
         cause: error,
       })
     throw error
+  } finally {
+    if (onAbort) gate.removeEventListener("abort", onAbort)
   }
 }

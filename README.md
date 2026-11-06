@@ -30,15 +30,11 @@ If you happen to use `OpenCode2`, you can use [`oc-web-rotate`](https://github.c
 
 ## Weights and Benchmark
 
-For WebSearch, the default routing weights are based on [Artificial Analysis's Search API Index](https://artificialanalysis.ai/agents/search-api).
+See the external [WebSearch ranking index](./benchmark/websearch/README.md) and [WebFetch ranking index](./benchmark/webfetch/README.md). Each directory includes source notes covering methodology, dates, provider coverage, and limitations.
 
-For WebFetch, we use our own [WebFetch Benchmark](./benchmark/README.md).
+WebSearch references published API-configuration results. WebFetch keeps fetch success rates separate from content quality; vendor-run benchmarks are explicitly labeled, and unranked providers receive no invented scores.
 
-We use `jev v1.13` as the judge model to score the results from each `WebFetch` provider.
-
-However, this is a personal project, so the benchmark is certainly not very standardized. Also, jev's context window is pitifully small (32k); it may not even fit both the result from one native webfetch (used as the baseline) and the result from a provider being tested blind.
-
-So you can still adjust the weights for each `WebSearch / WebFetch` provider according to your own criteria.
+These indexes do not automatically update default routing weights. You can still configure each provider's weight. The old Jev self-evaluation is retained only as a [historical record](./benchmark/webfetch/legacy-jev.md), not part of the current external rankings.
 
 ## Providers Currently Supported Natively by `core`
 
@@ -91,6 +87,16 @@ Listed in default routing priority order. Trim whitespace from a provider name a
 - Native built-in implementation `Keyless`
 
 If none of these providers meet your needs, you can also easily extend `core` with your own provider.
+
+## Observability: Attempts & Usage
+
+Every `searchWeb` / `fetchWeb` outcome carries structured, machine-readable diagnostics for monitoring UIs (e.g. a TUI), at attempt granularity. Keys never appear — only indices/tiers:
+
+- **`attempts[]`** — one entry per provider route attempt: `provider`, `keyless`, `keyIndex` (0-based index into the provider's deduplicated key list), `tier`, `queries` / `urls`, `durationMs`, `ok`, and `error` (including skip reasons such as a provider being blocked after an invalid-request error). Outcome-level cache reads show up as `provider: "cache"` entries with `cached: true`; on regular entries `cached` is reserved for providers that self-report cache hits. When every attempt fails, the thrown `Error` carries the same `attempts` array.
+- **`usage[]`** — per provider (and per tier when one is configured): `requests` (attempted provider calls), `results` (search) / `pages` (fetch) raw counts, and `errors`. Multiply with your own price table to estimate cost — pricing is deliberately kept out of `core`, and no provider API returns billing data.
+- **Attribution** — failed search `errors[]` name the `provider`, failed fetch pages keep their `provider`, and image outcomes report `provider: "native"`.
+
+Keys can also carry tier metadata: each `keys` entry may be a plain string (as before) or `{ key, tier?, weight? }` — or use the inline `"<tier>::<key>"` string syntax. A per-key `weight` overrides the provider weight for that key's route. Keyless routes can be tiered too via the reserved key value `"keyless"` — inline (`"free::keyless"`) or as an object (`{ key: "keyless", tier: "free", weight? }`) — which tags the free route and can also rank it through its per-route `weight` (keyed-only providers reject the marker with a config error). Outcome-level caching can be plugged in via `new LRUCache({ cap })` passed as `cache` in the config (with `cacheWindowSeconds` acting as its TTL).
 
 # Documentation
 

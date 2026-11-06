@@ -21,7 +21,7 @@ const PUBLISHED_LINE = /^Published:\s*(.+)$/m
 
 export const exa = {
   id: "exa",
-  weight: 73,
+  weight: 80,
   keyless: true,
   keylessEnabled: (settings) => settings.api !== "answer",
   options: settingsSchema,

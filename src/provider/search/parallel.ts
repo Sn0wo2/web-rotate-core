@@ -26,11 +26,9 @@ const settingsSchema = z.looseObject({
     })
     .optional(),
 })
-type ParallelSearchSettings = z.output<typeof settingsSchema>
-
 export const parallel = {
   id: "parallel",
-  weight: 74,
+  weight: 75,
   keyless: true,
   keylessEnabled: (settings) => settings.api !== "answer",
   batchSize: Infinity,
@@ -109,4 +107,4 @@ export const parallel = {
     })
     return searchResponse(payload)
   },
-} satisfies SearchProvider<ParallelSearchSettings>
+} satisfies SearchProvider<z.output<typeof settingsSchema>>

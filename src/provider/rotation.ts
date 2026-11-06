@@ -6,50 +6,50 @@ import type { Provider, ProviderEntry, ProviderKey, ProviderRoute } from "./type
 
 export type ParsedEntry = {
   keys: ProviderKey[]
+  keyless?: { tier?: string | undefined; weight?: number | undefined } | undefined
   settings: Record<string, unknown>
   weight: number
 }
 
-function parseKeyToken(token: string): ProviderKey {
-  const separator = token.indexOf("::")
-  if (separator > 0) {
-    const tier = token.slice(0, separator).trim()
-    const key = token.slice(separator + 2).trim()
-    if (tier && key) return { key, tier }
-  }
-  return { key: token }
-}
-
-export function parseProviderKeys(value: unknown, label: string): ProviderKey[] {
-  if (value === undefined) return []
+function parseProviderKeys(value: unknown, label: string): Pick<ParsedEntry, "keys" | "keyless"> {
+  if (value === undefined) return { keys: [] }
   const keys: ProviderKey[] = []
   const seen = new Set<string>()
-  for (const item of Array.isArray(value) ? value : [value]) {
-    if (typeof item === "string") {
-      for (const token of stringList(item)) {
-        const parsed = parseKeyToken(token)
-        if (!seen.has(parsed.key)) {
-          seen.add(parsed.key)
-          keys.push(parsed)
-        }
-      }
-      continue
-    }
+  let keyless: ParsedEntry["keyless"]
+  const items = (Array.isArray(value) ? value : [value]).flatMap((item) =>
+    typeof item === "string"
+      ? stringList(item).map((token) => {
+          const separator = token.indexOf("::")
+          if (separator > 0) {
+            const tier = token.slice(0, separator).trim()
+            const key = token.slice(separator + 2).trim()
+            if (tier && key) return { key, tier }
+          }
+          return { key: token }
+        })
+      : [item],
+  )
+  for (const item of items) {
     if (typeof item !== "object" || item === null)
       throw new RotateConfigError(`${label} provider keys must be strings or { key, tier?, weight? } objects`)
     const { key, tier, weight } = item as Record<string, unknown>
     if (typeof key !== "string" || !key.trim())
       throw new RotateConfigError(`${label} provider key objects require a non-empty string "key"`)
-    if (seen.has(key.trim())) continue
-    seen.add(key.trim())
+    const normalizedKey = key.trim()
     const parsedTier = stringValue(tier)
-    keys.push({
-      key: key.trim(),
+    const metadata = {
       ...(parsedTier ? { tier: parsedTier } : {}),
       ...(typeof weight === "number" && Number.isFinite(weight) ? { weight } : {}),
-    })
+    }
+    if (normalizedKey === "keyless") {
+      keyless ??= metadata
+      continue
+    }
+    if (seen.has(normalizedKey)) continue
+    seen.add(normalizedKey)
+    keys.push({ key: normalizedKey, ...metadata })
   }
-  return keys
+  return keyless === undefined ? { keys } : { keys, keyless }
 }
 
 export function resolveProviderEntries<P extends Provider<unknown>>(
@@ -71,8 +71,14 @@ export function resolveProviderEntries<P extends Provider<unknown>>(
         throw new RotateConfigError(`invalid settings for ${label} provider "${id}": ${z.prettifyError(parsed.error)}`)
       resolved = parsed.data as Record<string, unknown>
     }
+    const parsedKeys = parseProviderKeys(keys, label)
+    if (parsedKeys.keyless && !provider.keyless)
+      throw new RotateConfigError(
+        `${label} provider "${id}" supports no keyless routes; remove the "keyless" key entry`,
+      )
     entries.set(id, {
-      keys: parseProviderKeys(keys, label),
+      keys: parsedKeys.keys,
+      keyless: parsedKeys.keyless,
       settings: resolved,
       weight: weight ?? provider.weight,
     })
@@ -85,19 +91,19 @@ export function providerRoutes<P extends Provider<unknown>>(
   entries: ReadonlyMap<string, ParsedEntry>,
   globals: Globals,
 ): ProviderRoute<P>[] {
-  const groups = providers
-    .filter((provider) => entries.has(provider.id))
-    .map((provider) => {
-      const entry = entries.get(provider.id)
-      if (!entry) return []
-      const keyless =
-        provider.keyless && (provider.keylessEnabled?.(entry.settings, globals) ?? true)
-          ? [{ key: undefined, tier: undefined, weight: undefined, keyIndex: undefined }]
-          : []
-      const keyed = entry.keys.map((parsed, index) => {
-        return { ...parsed, keyIndex: index }
-      })
-      return (globals.prefer === "keyless" ? [...keyless, ...keyed] : [...keyed, ...keyless]).map((parsed) => {
+  const groups: ProviderRoute<P>[][] = []
+  for (const provider of providers) {
+    const entry = entries.get(provider.id)
+    if (!entry) continue
+    const keyless =
+      provider.keyless && (provider.keylessEnabled?.(entry.settings, globals) ?? true)
+        ? [{ key: undefined, ...entry.keyless, keyIndex: undefined }]
+        : []
+    const keyed = entry.keys.map((parsed, index) => {
+      return { ...parsed, keyIndex: index }
+    })
+    groups.push(
+      (globals.prefer === "keyless" ? [...keyless, ...keyed] : [...keyed, ...keyless]).map((parsed) => {
         return {
           ...provider,
           key: parsed.key,
@@ -106,7 +112,8 @@ export function providerRoutes<P extends Provider<unknown>>(
           settings: entry.settings,
           weight: parsed.weight ?? entry.weight,
         }
-      })
-    })
+      }),
+    )
+  }
   return compact(zip(...groups).flat())
 }

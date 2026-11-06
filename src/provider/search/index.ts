@@ -1,11 +1,15 @@
+import { apify } from "./apify"
 import { bocha } from "./bocha"
 import { brave } from "./brave"
 import { brightdata } from "./brightdata"
+import { claude } from "./claude"
 import { deepseek } from "./deepseek"
 import { diffbot } from "./diffbot"
 import { doubao } from "./doubao"
 import { exa } from "./exa"
 import { firecrawl } from "./firecrawl"
+import { gemini } from "./gemini"
+import { grok } from "./grok"
 import { hyperbrowser } from "./hyperbrowser"
 import { jina } from "./jina"
 import { keenable } from "./keenable"
@@ -44,10 +48,14 @@ export const SEARCH_PROVIDERS = [
   scrapingbee as Registered<typeof scrapingbee, "scrapingbee">,
   diffbot as Registered<typeof diffbot, "diffbot">,
   brightdata as Registered<typeof brightdata, "brightdata">,
+  apify as Registered<typeof apify, "apify">,
   linkup as Registered<typeof linkup, "linkup">,
   doubao as Registered<typeof doubao, "doubao">,
   deepseek as Registered<typeof deepseek, "deepseek">,
   openai as Registered<typeof openai, "openai">,
+  grok as Registered<typeof grok, "grok">,
+  claude as Registered<typeof claude, "claude">,
+  gemini as Registered<typeof gemini, "gemini">,
   native as Registered<typeof native, "native">,
   zhipu as Registered<typeof zhipu, "zhipu">,
 ] as const

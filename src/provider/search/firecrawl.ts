@@ -11,7 +11,7 @@ type FirecrawlSearchSettings = z.output<typeof settingsSchema>
 
 export const firecrawl = {
   id: "firecrawl",
-  weight: 71,
+  weight: 73,
   keyless: true,
   keylessEnabled: (settings) => settings.keyless !== false,
   options: settingsSchema,

@@ -14,8 +14,6 @@ const settingsSchema = z.looseObject({
   max_tokens: z.number().optional(),
   max_tokens_per_page: z.number().optional(),
 })
-type PerplexitySearchSettings = z.output<typeof settingsSchema>
-
 export const perplexity = {
   id: "perplexity",
   weight: 80,
@@ -71,4 +69,4 @@ export const perplexity = {
     })
     return searchResponse(payload)
   },
-} satisfies SearchProvider<PerplexitySearchSettings>
+} satisfies SearchProvider<z.output<typeof settingsSchema>>

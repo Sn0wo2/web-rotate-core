@@ -6,7 +6,7 @@ import { fetchOne, providerResult } from "./utils"
 
 export const scrapingant = {
   id: "scrapingant",
-  weight: 69,
+  weight: 40,
   formats: ["html", "markdown", "text"],
   run: fetchOne<Record<string, unknown>>(async ({ settings, key, url, signal, format }) => {
     const endpoint = urlParams(

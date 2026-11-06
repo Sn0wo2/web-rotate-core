@@ -1,5 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import { setTimeout as sleep } from "node:timers/promises"
+import { mean } from "es-toolkit/math"
 import type { FetchProvider, FetchProviderConfig, ProviderEntry } from "../src/index"
 import { FETCH_PROVIDERS, fetchWeb, RotateConfigError } from "../src/index"
 import { mapConcurrent } from "../src/shared/utils"
@@ -120,10 +122,6 @@ function positive(value: string, name: string): number {
   return parsed
 }
 
-type EnvContext = {
-  getOption(name: string): string | undefined
-}
-
 function envMap(parsed: Parsed): Map<string, string> {
   return new Map(
     parsed.env.map((entry) => {
@@ -133,13 +131,6 @@ function envMap(parsed: Parsed): Map<string, string> {
         : ([entry, ""] as [string, string])
     }),
   )
-}
-
-function buildContext(parsed: Parsed): EnvContext {
-  const env = envMap(parsed)
-  return {
-    getOption: (name) => env.get(name) ?? process.env[name.toUpperCase()],
-  }
 }
 
 function providerKeys(env: Map<string, string>, id: string): string[] | undefined {
@@ -282,20 +273,19 @@ type JudgeConfig = { endpoint: string; apiKey: string; model: string }
 type ScoreAnswer = { score?: number; confidence?: number }
 type Usage = { input_tokens?: number; output_tokens?: number }
 
-function judgeConfig(ctx: EnvContext): JudgeConfig {
-  const rawBase = ctx.getOption("TYPESAFE_BASE_URL") || process.env.TYPESAFE_BASE_URL
+function judgeConfig(parsed: Parsed): JudgeConfig {
+  const env = envMap(parsed)
+  const rawBase = env.get("TYPESAFE_BASE_URL") || process.env.TYPESAFE_BASE_URL
   if (!rawBase) throw new RotateConfigError("TYPESAFE_BASE_URL is not configured")
   const base = rawBase.replace(TRAILING_SLASHES, "")
-  const apiKey = ctx.getOption("TYPESAFE_API_KEY") || process.env.TYPESAFE_API_KEY
+  const apiKey = env.get("TYPESAFE_API_KEY") || process.env.TYPESAFE_API_KEY
   if (!apiKey) throw new RotateConfigError("TYPESAFE_API_KEY is not configured")
   return {
     endpoint: VERSIONED_API_ENDPOINT.test(base) ? `${base}/systemone` : `${base}/v1/systemone`,
     apiKey,
-    model: ctx.getOption("TYPESAFE_MODEL") || process.env.TYPESAFE_MODEL || DEFAULT_MODEL,
+    model: env.get("TYPESAFE_MODEL") || process.env.TYPESAFE_MODEL || DEFAULT_MODEL,
   }
 }
-
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 async function judgeRead(
   cfg: JudgeConfig,
@@ -481,8 +471,6 @@ async function judgeURL(
   return { scores, confidences, judgements }
 }
 
-const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
-
 const stddev = (values: number[]) => {
   if (values.length < 2) return 0
   const average = mean(values)
@@ -623,8 +611,7 @@ async function main() {
   )
   const urls = [...new Set(positions)]
   if (!urls.length) throw new Error(USAGE)
-  const ctx = buildContext(parsed)
-  const cfg = judgeConfig(ctx)
+  const cfg = judgeConfig(parsed)
   const selection = selectProviders(parsed, parsed.providers.length ? parsed.providers : undefined)
   const selected = selection.filter((row) => !row.skip)
 
