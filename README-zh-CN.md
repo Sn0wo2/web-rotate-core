@@ -6,7 +6,7 @@
 
 ## 语言
 
-[English](README.md) | [简体中文](README-zh-CN.md)
+[English](README.md)
 
 ## 来源小故事
 
@@ -30,13 +30,9 @@
 
 如果你恰好用的是 `OpenCode2` 那么, 你可以直接用 [`oc-web-rotate`](https://github.com/Sn0wo2/oc-web-rotate)
 
-## 权重和Benchmark
+## 权重
 
-外部评测结果见 [WebSearch Index](./benchmark/websearch/README.md)和 [WebFetch Index](./benchmark/webfetch/README.md)。各目录附有来源整理，记录评测方法、数据日期、供应商覆盖和限制。
-
-WebSearch 引用外部已发布的具体 API 配置成绩。WebFetch 将抓取成功率与正文质量分开，明确标注厂商自办评测，不为未排名供应商编造分数。
-
-默认路由权重已参考当前索引人工核对并同步；未获得可比结果的提供商及未受测配置保留原有策略权重。你仍可自行配置提供商和单 Key 的权重。
+默认权重参考了 [WebSearch Rank Index](./benchmark/websearch/README.md) 和 [WebFetch Rank Index](./benchmark/webfetch/README.md)。
 
 ## 目前 `core` 原生支持的提供商
 
