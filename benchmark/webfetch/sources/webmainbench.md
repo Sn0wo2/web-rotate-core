@@ -1,29 +1,29 @@
-# 来源整理：WebMainBench
+# Source Notes: WebMainBench
 
-## 原始来源与时间
+## Source and snapshot
 
-- 发布者：OpenDataLab；基准服务于同团队 MinerU-HTML／Dripper 研究，需注意方法作者与基准发布者的关联。
-- [原始仓库、方法及结果](https://github.com/opendatalab/WebMainBench)
-- [数据集](https://huggingface.co/datasets/opendatalab/WebMainBench)
-- [论文：Dripper: Token-Efficient Main HTML Extraction with a Lightweight LM](https://arxiv.org/abs/2511.23119)
-- 本次核验：**2026-11-06**，原始 README HTTP 200。来源 README 没有给出所有结果统一的测量日期，不用仓库更新时间替代。
+OpenDataLab publishes this benchmark for its own team's MinerU-HTML/Dripper research. The relationship between the benchmark publisher and method authors matters when interpreting the results.
 
-## 数据与指标
+Sources: [repository, methodology, and results](https://github.com/opendatalab/WebMainBench), [dataset](https://huggingface.co/datasets/opendatalab/WebMainBench), and [Dripper: Token-Efficient Main HTML Extraction with a Lightweight LM](https://arxiv.org/abs/2511.23119).
 
-- 全集：7,809 个网页、5,434 个域名、46 种语言；来源说明 HTML 标签级标注经标注员、复核员、高级检查员三轮人工处理。
-- 精细子集：545 页，人工校准的 `groundtruth_content` Markdown。
-- 全集指标：将内容转为规范化 Markdown 后计算 ROUGE-N F1。
-- 子集指标：文本、代码、公式、表格内容的编辑距离，以及表格结构 TEDS；综合值按来源的五项指标平均。
-- 代码及数据公开；仓库标示 Apache-2.0，数据使用仍以数据集页面的授权说明为准。
+Recorded source check: **2026-11-06**; the repository README returned HTTP 200. The README does not give a common measurement date for all results. Repository update times are not used as a substitute.
 
-## 原榜比较对象
+## Data and metrics
 
-全集表列出 Dripper、Dripper fallback、magic-html、Readability、Trafilatura、Resiliparse，以及在 Dripper 管线中替换模型的 DeepSeek-V3.2、GPT-5、Gemini-2.5-Pro。
+The full dataset contains 7,809 pages from 5,434 domains in 46 languages. The source describes three rounds of human processing for HTML tag-level annotations: annotation, review, and senior inspection. A detailed 545-page subset provides manually calibrated `groundtruth_content` Markdown.
 
-这不是把同一批 URL 交给不同商业抓取 API 的榜单。精细子集表同样比较 MinerU-HTML 与抽取库，不包含 Firecrawl、Tavily、Exa、Jina 等供应商完整链路成绩。
+The full-dataset metric is ROUGE-N F1 after conversion to normalized Markdown. The detailed subset measures edit distance for text, code, formulas, and table content, plus TEDS for table structure. Its aggregate is the source's average of those five metrics.
 
-## 采用边界
+Code and data are public. The repository states Apache-2.0; dataset use remains subject to the license terms on the dataset page.
 
-可作为正文及 Markdown 结构质量的公开方法参考，但不提供实时抓取、反爬、渲染能力排名，也不自动证明其发布方方法优于所有商业产品。
+## Published comparisons
 
-[最终索引](../README.md)只引用其测量范围，不把静态 HTML 方法名次当作商业 API 名次，也不在本项目另设裁判模型给商业供应商补分。
+The full-dataset table includes Dripper, Dripper fallback, magic-html, Readability, Trafilatura, and Resiliparse, plus DeepSeek-V3.2, GPT-5, and Gemini-2.5-Pro as model substitutions within the Dripper pipeline.
+
+These are not results from sending the same URLs to commercial scraping APIs. The detailed-subset table likewise compares MinerU-HTML with extraction libraries; it does not report end-to-end results for providers such as Firecrawl, Tavily, Exa, or Jina.
+
+## Use and limitations
+
+WebMainBench provides a public methodological reference for main-content and Markdown-structure quality. It does not rank live fetching, anti-bot handling, or rendering, and it does not by itself establish that the publisher's methods outperform every commercial product.
+
+The [WebFetch index](../README.md) cites its measurement scope only. Static HTML method ranks are not treated as commercial API ranks, and this project does not introduce a separate judge model to fill in commercial-provider scores.

@@ -1,22 +1,8 @@
-# 外部 Benchmark 索引
+# Benchmark Index
 
-核验日期：**2026-11-06**。
+Snapshot: **2026-11-06**. These pages index external benchmark results and their limitations. They do not assign project scores or combine results across benchmarks.
 
-| 能力      | 最终排名索引                    | 排名依据                                                           |
-| --------- | ------------------------------- | ------------------------------------------------------------------ |
-| WebSearch | [搜索排名](websearch/README.md) | Artificial Analysis 的可核验公开配置成绩；Vals 为领域补榜          |
-| WebFetch  | [抓取排名](webfetch/README.md)  | 分别展示外部可达率结果、第三方对照与正文抽取研究，不编造综合质量分 |
-
-各目录的 `sources/` 保存来源整理：原始链接、数据日期、评测方法、覆盖范围、利益冲突和采用边界。它们是来源摘要，不是原站全文镜像。
-
-## 使用约定
-
-- 不由本项目自行打分，不跨评测相加、平均或补分；同一来源的排名保留原有顺序。
-- 按具体 API、模式和模型组合引用成绩；同品牌的不同端点、付费与免密路径不能自动共用分数。
-- “未评测”或“未取得公开分数”不等于零分、失败或排在末位。
-- 搜索答题准确率、抓取可达率、正文质量是不同指标，不合成一个总榜。
-- 索引是带日期的外部结果快照，不自动同步代码中的默认路由权重；更新时需同时核验来源、配置和供应商覆盖。
-
-## 历史自评
-
-旧的 8 URL、Jev 裁判实验移至 [历史 WebFetch 自评记录](webfetch/legacy-jev.md)，不纳入当前外部排名。`benchmark/run.ts` 仍是旧实验脚本，不会生成这里的外部榜单。
+| Tool      | Index                                       | Coverage                                                                                              |
+| --------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| WebSearch | [WebSearch benchmarks](websearch/README.md) | Artificial Analysis search configurations and Vals model-tool combinations                            |
+| WebFetch  | [WebFetch benchmarks](webfetch/README.md)   | Fetch success, latency, cost, and static HTML extraction research, kept separate by measurement scope |

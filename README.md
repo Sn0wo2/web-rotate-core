@@ -1,5 +1,7 @@
 # web-rotate-core
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Sn0wo2/web-rotate-core)
+
 > One Gateway for All WebSearch/WebFetch Providers!
 
 ## Language
@@ -30,15 +32,13 @@ If you happen to use `OpenCode2`, you can use [`oc-web-rotate`](https://github.c
 
 ## Weights and Benchmark
 
-See the external [WebSearch ranking index](./benchmark/websearch/README.md) and [WebFetch ranking index](./benchmark/webfetch/README.md). Each directory includes source notes covering methodology, dates, provider coverage, and limitations.
+See the external [WebSearch Index](./benchmark/websearch/README.md) and [WebFetch Index](./benchmark/webfetch/README.md). Each directory includes source notes covering methodology, dates, provider coverage, and limitations.
 
 WebSearch references published API-configuration results. WebFetch keeps fetch success rates separate from content quality; vendor-run benchmarks are explicitly labeled, and unranked providers receive no invented scores.
 
-These indexes do not automatically update default routing weights. You can still configure each provider's weight. The old Jev self-evaluation is retained only as a [historical record](./benchmark/webfetch/legacy-jev.md), not part of the current external rankings.
+Default routing weights have been manually reviewed and synchronized against the current indexes; providers without comparable results and untested configurations retain their existing policy weights. You can still configure provider and per-key weights.
 
 ## Providers Currently Supported Natively by `core`
-
-Listed in default routing priority order. Trim whitespace from a provider name and lowercase it to get the provider `id`.
 
 ### WebSearch
 
@@ -60,11 +60,16 @@ Listed in default routing priority order. Trim whitespace from a provider name a
 - [ScrapingBee](https://www.scrapingbee.com)
 - [Diffbot](https://www.diffbot.com)
 - [Bright Data](https://brightdata.com)
+- [Apify](https://apify.com)
 - [Linkup](https://www.linkup.so)
 - [Doubao](https://www.volcengine.com)
 - [DeepSeek](https://www.deepseek.com)
 - [OpenAI](https://openai.com)
+- [Grok](https://x.ai)
+- [Claude](https://www.anthropic.com)
+- [Gemini](https://ai.google.dev)
 - Native built-in implementation `Keyless`
+- [Zhipu](https://open.bigmodel.cn)
 
 ### WebFetch
 
@@ -76,6 +81,10 @@ Listed in default routing priority order. Trim whitespace from a provider name a
 - [Firecrawl](https://www.firecrawl.dev) `Keyless`
 - [TinyFish](https://www.tinyfish.ai)
 - [Jina](https://jina.ai) `Keyless`
+- [Keenable](https://keenable.ai) `Keyless`
+- [Nimble](https://nimbleway.com)
+- [Octen](https://octen.ai)
+- [Serper](https://serper.dev)
 - [ScrapingAnt](https://scrapingant.com)
 - [ScrapingBee](https://www.scrapingbee.com)
 - [ScrapFly](https://scrapfly.io)
@@ -84,7 +93,12 @@ Listed in default routing priority order. Trim whitespace from a provider name a
 - [Apify](https://apify.com)
 - [Linkup](https://www.linkup.so)
 - [DeepSeek](https://www.deepseek.com)
+- [Bocha](https://bochaai.com)
+- [Doubao](https://www.volcengine.com)
+- [Claude](https://www.anthropic.com)
+- [Gemini](https://ai.google.dev)
 - Native built-in implementation `Keyless`
+- [Zhipu](https://open.bigmodel.cn)
 
 If none of these providers meet your needs, you can also easily extend `core` with your own provider.
 
@@ -97,7 +111,3 @@ Every `searchWeb` / `fetchWeb` outcome carries structured, machine-readable diag
 - **Attribution** — failed search `errors[]` name the `provider`, failed fetch pages keep their `provider`, and image outcomes report `provider: "native"`.
 
 Keys can also carry tier metadata: each `keys` entry may be a plain string (as before) or `{ key, tier?, weight? }` — or use the inline `"<tier>::<key>"` string syntax. A per-key `weight` overrides the provider weight for that key's route. Keyless routes can be tiered too via the reserved key value `"keyless"` — inline (`"free::keyless"`) or as an object (`{ key: "keyless", tier: "free", weight? }`) — which tags the free route and can also rank it through its per-route `weight` (keyed-only providers reject the marker with a config error). Outcome-level caching can be plugged in via `new LRUCache({ cap })` passed as `cache` in the config (with `cacheWindowSeconds` acting as its TTL).
-
-# Documentation
-
-Code documentation is available at <https://deepwiki.com/Sn0wo2/web-rotate-core>.

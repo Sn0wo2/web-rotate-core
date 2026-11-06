@@ -1,37 +1,37 @@
-# 来源整理：Proxyway Web Scraping API Report 2025
+# Source Notes: Proxyway Web Scraping API Report 2025
 
-## 原始来源与时间
+## Source and snapshot
 
-- 发布者：Proxyway，第三方行业评测媒体，不据联盟营销关系推断其为参评厂商所有。
-- [原始报告](https://proxyway.com/research/web-scraping-api-report-2025)
-- [Research 索引](https://proxyway.com/research)
-- 来源说明大部分测试完成于 **2025-10**。
-- 本次核验：**2026-11-06**，报告 HTTP 200；Research 索引仍链接此抓取 API 报告。索引中的 2026 Proxy Market Report 是代理市场报告，不等于新版抓取 API 报告。
+Proxyway is a third-party industry review publisher. Affiliate relationships alone do not establish ownership by a participating provider.
 
-## 商业关系披露
+Sources: [original report](https://proxyway.com/research/web-scraping-api-report-2025) and [research index](https://proxyway.com/research). The report states that most tests took place in **2025-10**.
 
-原页明确说明：
+Recorded source check: **2026-11-06**; the report returned HTTP 200, and the research index still linked to it. The index's 2026 Proxy Market Report covers the proxy market; it is not a newer scraping API report.
+
+## Commercial disclosures
+
+The report explicitly states:
 
 > We use affiliate links. They let us sustain ourselves at no cost to you.
 
-多数供应商经主动联系后提供测试权限；Firecrawl、ZenRows 由评测方购买。因此它是有商业关系披露的第三方评测，不应称完全无利益冲突的实验室，也没有证据将它归为某参评厂商自办榜。
+Most providers supplied test access after outreach; the reviewers purchased access to Firecrawl and ZenRows. This is a third-party evaluation with disclosed commercial relationships. It is not a conflict-free laboratory study, and the reviewed evidence does not establish that a participating vendor runs the benchmark.
 
-## 范围与方法
+## Scope and methodology
 
-- 11 家：Apify、Crawlbase、Decodo、Firecrawl、NetNut、Nimble、Oxylabs、ScraperAPI、ScrapingBee、ZenRows、Zyte。
-- 15 个目标网站：Allegro、Amazon、ChatGPT、G2、Google、Hyatt、Immobilienscout24、Instagram、Leboncoin、Lowe's、Nordstrom、Shein、Walmart、YouTube、Zillow。
-- 每目标约 6,000 个不同 URL；测试负载为每秒 2 次及 10 次请求，超时 600 秒。
-- 通过响应状态、页面大小和标题等启发式判断成功，部分目标额外检查 CSS 选择器。
-- 按目标启用渲染或高级解锁选项，不能假定等于本库默认调用参数。
+The report covers 11 providers: Apify, Crawlbase, Decodo, Firecrawl, NetNut, Nimble, Oxylabs, ScraperAPI, ScrapingBee, ZenRows, and Zyte.
 
-这测量可达率、响应时间与成本，不是正文逐字完整度、噪声或 Markdown 结构质量；页面类别和反爬差异也影响结果。
+Its 15 target sites are Allegro, Amazon, ChatGPT, G2, Google, Hyatt, Immobilienscout24, Instagram, Leboncoin, Lowe's, Nordstrom, Shein, Walmart, YouTube, and Zillow. Tests use approximately 6,000 distinct URLs per target site, loads of 2 and 10 requests per second, and a 600-second timeout.
 
-## 可引用的结果与不可生成的排名
+Success is determined through heuristics such as response status, page size, and title, with additional CSS-selector checks for some targets. Rendering or advanced unlocking options are enabled per target, so the tested settings cannot be assumed to match this project's defaults.
 
-原页 `Summary`、`Benchmark Results` 等部分包含成功率、响应时间、分目标／负载图表、难目标分析和成本对比。
+The report measures fetch success, response time, and cost. It does not measure verbatim main-content completeness, noise, or Markdown-structure quality. Page categories and anti-bot differences also affect the results.
 
-本次可读取内容中**没有取得一张可核验的供应商统一数字总榜**，嵌入图表也未暴露完整逐供应商原始数值。编辑性的推荐、某项“最快”或“最便宜”文字，不转换为综合名次。
+## Usable results and ranking limits
 
-本次未找到公开的逐次响应数据、完整目标列表及可复现评分脚本。因此[最终索引](../README.md)将它用于第三方方向性对照，不擅自从图表或文字结论合成分数，也不与 String 的不同样本、年份及超时设置混算。
+Sections such as `Summary` and `Benchmark Results` include success rates, response times, charts by target and load, analysis of difficult targets, and cost comparisons.
 
-参评品牌与本项目 WebFetch 重合的只有 Apify、Firecrawl、ScrapingBee；Nimble 在本项目仅有 WebSearch 实现。
+**No verifiable unified numerical provider ranking was obtained from the accessible material.** Embedded charts did not expose complete raw values for every provider. Editorial recommendations and claims such as "fastest" or "cheapest" are not converted into overall ranks.
+
+The source review did not find public per-attempt response data, a complete target list, or reproducible scoring scripts. The [WebFetch index](../README.md) therefore uses the report as a third-party directional comparison. It does not synthesize scores from charts or prose, or combine these results with String's different samples, year, and timeout settings.
+
+Apify, Firecrawl, Nimble, and ScrapingBee overlap with this project's WebFetch registry.

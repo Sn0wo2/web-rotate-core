@@ -7,7 +7,7 @@ import { fetchOne, providerResult } from "./utils"
 
 export const firecrawl = {
   id: "firecrawl",
-  weight: 81,
+  weight: 81.2,
   keyless: true,
   formats: ["html", "markdown"],
   run: fetchOne<Record<string, unknown>>(async ({ settings, key, url, signal, format, globals }) => {

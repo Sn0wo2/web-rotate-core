@@ -7,7 +7,7 @@ import { fetchOne, providerResult } from "./utils"
 
 export const nimble = {
   id: "nimble",
-  weight: 60,
+  weight: 68,
   formats: ["html", "markdown"],
   run: fetchOne<Record<string, unknown>>(async ({ settings, key, url, signal, format }) => {
     const payload = await apiJSON("https://sdk.nimbleway.com/v2/extract", signal, {

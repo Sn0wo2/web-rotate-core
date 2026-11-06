@@ -18,7 +18,7 @@ type ScrapflyFetchSettings = z.output<typeof settingsSchema>
 
 export const scrapfly = {
   id: "scrapfly",
-  weight: 87,
+  weight: 86.8,
   formats: ["html", "markdown", "text"],
   options: settingsSchema,
   run: fetchOne<ScrapflyFetchSettings>(async ({ settings, key, url, signal, format, globals }) => {

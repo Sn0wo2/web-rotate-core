@@ -12,5 +12,5 @@
     "resolveJsonModule": true,
     "noPropertyAccessFromIndexSignature": false
   },
-  "include": ["src/**/*.ts", "benchmark/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

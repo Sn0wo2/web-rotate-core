@@ -1,69 +1,75 @@
-# WebSearch 最终排名索引
+# WebSearch Benchmark Index
 
-核验日期：**2026-11-06**。本页只索引外部结果，不自行评分，也不合成跨榜总分。
+Snapshot: **2026-11-06**. This page indexes external results. It does not assign scores or combine results across leaderboards.
 
-| 榜单                             | 数据日期   | 采用范围                            | 来源整理                                                   |
-| -------------------------------- | ---------- | ----------------------------------- | ---------------------------------------------------------- |
-| Artificial Analysis Search Index | 2026-10-19 | 通用搜索主参考，按具体 API 配置列分 | [方法、完整配置范围与限制](sources/artificial-analysis.md) |
-| Vals Web Search Index            | 2026-10-21 | 金融／法律领域的模型＋搜索工具补榜  | [完整 9 组合排名](sources/vals.md)                         |
-| OpenBenchmarks Company News      | 2026-10-21 | 暂不采用：来源明确提示索引时间偏差  | [排除原因](sources/openbenchmarks.md)                      |
+| Benchmark                        | Data date  | Use in this index                                                                 | Source notes                                                                             |
+| -------------------------------- | ---------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Artificial Analysis Search Index | 2026-10-19 | Primary general-search reference, with scores tied to specific API configurations | [Methodology, full configuration scope, and limitations](sources/artificial-analysis.md) |
+| Vals Web Search Index            | 2026-10-21 | Finance and law supplement for model-tool combinations                            | [All 9 ranked combinations](sources/vals.md)                                             |
+| OpenBenchmarks Company News      | 2026-10-21 | Excluded pending a fix for the source's disclosed indexing-time bias              | [Reason for exclusion](sources/openbenchmarks.md)                                        |
 
-## 搜索主榜：AA 可核验公开子集
+## Primary reference: AA's verifiable public subset
 
-来源：[Artificial Analysis 原榜](https://artificialanalysis.ai/agents/search-api)。分数为原站发布的 Search Index（0–100），不由本项目重算。
+Source: [Artificial Analysis leaderboard](https://artificialanalysis.ai/agents/search-api). Search Index scores use the source's published 0-100 scale and are not recalculated by this project.
 
-**完整评测范围是 26 个配置、14 家供应商，不是 26 家供应商。** 本次可读取的公开表仅确认以下 **12 个 API 配置、10 家供应商**，另有模型无搜索基线。其余 14 个配置没有取得可核验的公开成绩，不推断其名次；本表不是完整 26 配置总榜。
+**The full evaluation covers 26 configurations from 14 providers, not 26 providers.** The public table accessible during the source review confirmed only the **12 API configurations from 10 providers** below, plus a no-search model baseline. No verifiable public scores were obtained for the other 14 configurations, and their ranks are not inferred. This is not the complete 26-configuration leaderboard.
 
-| 展示顺序 | API 配置                              | 项目 ID      | Search Index |
-| -------- | ------------------------------------- | ------------ | ------------ |
-| 1        | Exa Search — auto, dynamic highlights | `exa`        | 80           |
-| 2        | Perplexity Search — medium            | `perplexity` | 80           |
-| 3        | Exa Search — lite, dynamic highlights | `exa`        | 79           |
-| 4        | Perplexity Search — high              | `perplexity` | 79           |
-| 5        | Octen Search — highlights             | `octen`      | 77           |
-| 6        | Parallel Search — advanced            | `parallel`   | 75           |
-| 7        | Brave Search — LLM context            | `brave`      | 75           |
-| 8        | OpenAI Web Search — medium            | `openai`     | 74           |
-| 9        | You.com Search — highlights           | `you`        | 74           |
-| 10       | Nimble Search — standard              | `nimble`     | 74           |
-| 11       | Firecrawl Search                      | `firecrawl`  | 73           |
-| 12       | DeepSeek Search — summary             | `deepseek`   | 69           |
+| Display order | API configuration                     | Project ID   | Search Index |
+| ------------- | ------------------------------------- | ------------ | ------------ |
+| 1             | Exa Search (auto, dynamic highlights) | `exa`        | 80           |
+| 2             | Perplexity Search (medium)            | `perplexity` | 80           |
+| 3             | Exa Search (lite, dynamic highlights) | `exa`        | 79           |
+| 4             | Perplexity Search (high)              | `perplexity` | 79           |
+| 5             | Octen Search (highlights)             | `octen`      | 77           |
+| 6             | Parallel Search (advanced)            | `parallel`   | 75           |
+| 7             | Brave Search (LLM context)            | `brave`      | 75           |
+| 8             | OpenAI Web Search (medium)            | `openai`     | 74           |
+| 9             | You.com Search (highlights)           | `you`        | 74           |
+| 10            | Nimble Search (standard)              | `nimble`     | 74           |
+| 11            | Firecrawl Search                      | `firecrawl`  | 73           |
+| 12            | DeepSeek Search (summary)             | `deepseek`   | 69           |
 
-展示顺序沿用来源；相同的公开整数分数不代表有可确认的优劣差距。模型无搜索基线为 **33**，不是供应商，不参与本表。
+Display order follows the source. Equal published integer scores do not establish a performance difference. The no-search model baseline scores **33**; it is not a provider and is excluded from this table.
 
-该指数衡量固定回答模型使用搜索工具后的任务表现，不是纯 SERP 相关性。OpenAI 使用原生搜索工具及集成流程，与第三方 API 的 Stirrup 流程存在差异，见来源整理。
+The index measures task performance when a fixed answering model uses a search tool, rather than pure SERP relevance. OpenAI uses a native search tool and integration that differ from the Stirrup workflow used for third-party APIs; see the source notes.
 
-## 领域补榜：Vals
+## Domain supplement: Vals
 
-以下是 Vals 原榜的前三个**模型＋工具组合**，不能据此给搜索供应商单独排通用名次。
+These are the top three **model-tool combinations** in the Vals leaderboard. They do not establish a general ranking of search providers in isolation.
 
-| 原榜名次 | 模型           | 搜索工具 | Overall |
-| -------- | -------------- | -------- | ------- |
-| 1        | GPT-5.6 Sol    | Keenable | 49.08%  |
-| 2        | Claude Fable 5 | Exa      | 48.45%  |
-| 3        | Claude Fable 5 | Native   | 46.94%  |
+| Source rank | Model          | Search tool | Overall |
+| ----------- | -------------- | ----------- | ------- |
+| 1           | GPT-5.6 Sol    | Keenable    | 49.08%  |
+| 2           | Claude Fable 5 | Exa         | 48.45%  |
+| 3           | Claude Fable 5 | Native      | 46.94%  |
 
-[完整 9 组合、任务范围及评分方法](sources/vals.md)。不把 Vals 的百分比与 AA 的指数合并。
+See [all 9 combinations, task scope, and scoring](sources/vals.md). Vals percentages are not combined with AA's index.
 
-## 项目覆盖与缺分索引
+## Project coverage and missing scores
 
-当前注册 **23 家外部供应商＋`native`**。AA 方法表覆盖其中 **14/23**；本次公开成绩能确认其中 **10/23**。
+At this snapshot, WebSearch registers **27 external providers plus `native`**. AA's methodology table covers **14/27** of those providers; the public scores obtained during the review cover **10/27**.
 
-| 项目 ID        | 当前外部证据状态                                                          |
-| -------------- | ------------------------------------------------------------------------- |
-| `keenable`     | AA 列出 pro／realtime，未取得公开成绩；有 Vals 组合成绩，不能补入 AA 主榜 |
-| `linkup`       | AA 列出 flash alpha／fast／standard，未取得公开成绩                       |
-| `tavily`       | AA 列出 basic，未取得公开成绩                                             |
-| `tinyfish`     | AA 列出 web，未取得公开成绩                                               |
-| `hyperbrowser` | 本次 AA 配置表未覆盖                                                      |
-| `serper`       | 本次 AA 配置表未覆盖                                                      |
-| `bocha`        | 本次 AA 配置表未覆盖                                                      |
-| `jina`         | 本次 AA 配置表未覆盖                                                      |
-| `scrapingbee`  | 本次 AA 配置表未覆盖                                                      |
-| `diffbot`      | 本次 AA 配置表未覆盖                                                      |
-| `brightdata`   | 本次 AA 配置表未覆盖                                                      |
-| `doubao`       | 本次 AA 配置表未覆盖                                                      |
-| `zhipu`        | 本次 AA 配置表未覆盖                                                      |
-| `native`       | 本库本地实现，未在上述来源中按此实现独立测评                              |
+| Project ID     | External evidence at this snapshot                                                                                   |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `keenable`     | AA lists pro/realtime, but no public scores were obtained; Vals combination scores cannot fill the gap in AA's table |
+| `linkup`       | AA lists flash alpha/fast/standard, but no public scores were obtained                                               |
+| `tavily`       | AA lists basic, but no public score was obtained                                                                     |
+| `tinyfish`     | AA lists web, but no public score was obtained                                                                       |
+| `hyperbrowser` | Not covered by the reviewed AA configuration table                                                                   |
+| `serper`       | Not covered by the reviewed AA configuration table                                                                   |
+| `bocha`        | Not covered by the reviewed AA configuration table                                                                   |
+| `jina`         | Not covered by the reviewed AA configuration table                                                                   |
+| `scrapingbee`  | Not covered by the reviewed AA configuration table                                                                   |
+| `diffbot`      | Not covered by the reviewed AA configuration table                                                                   |
+| `brightdata`   | Not covered by the reviewed AA configuration table                                                                   |
+| `apify`        | Not covered by the reviewed AA configuration table                                                                   |
+| `doubao`       | Not covered by the reviewed AA configuration table                                                                   |
+| `grok`         | Not covered by the reviewed AA configuration table                                                                   |
+| `claude`       | Not covered by the reviewed AA configuration table                                                                   |
+| `gemini`       | Not covered by the reviewed AA configuration table                                                                   |
+| `zhipu`        | Not covered by the reviewed AA configuration table                                                                   |
+| `native`       | Local implementation; the sources above do not independently evaluate this project's implementation                  |
 
-项目的 `native` 不是 Vals 的 Native，也不是 AA 的模型无搜索基线。品牌覆盖也不等于项目默认配置已被测评：例如项目 Parallel 默认 `fast` 不能套用 `advanced` 成绩，Perplexity 默认 `low` 不能套用 `medium` 成绩。此页不修改任何默认权重。
+This project's `native` is neither Vals' Native nor AA's no-search model baseline. Brand coverage also does not establish that project defaults were tested: Parallel's default `fast` cannot inherit the `advanced` score, and Perplexity's default `low` cannot inherit the `medium` score.
+
+Manual weight review (**2026-11-06**): Exa (`80`), Octen (`77`), Brave (`75`), OpenAI (`74`), You.com (`74`), Nimble (`74`), Firecrawl (`73`), and DeepSeek (`69`) already use the published reference values as routing weights, so no numeric changes were needed. These are routing-policy references, not claims that every default parameter, model, or keyless interface was evaluated. Perplexity (`80`), Parallel (`75`), and providers without published scores retain their existing policy weights rather than inheriting scores for untested configurations. Provider and per-key weight overrides remain supported.

@@ -1,41 +1,39 @@
-# 来源整理：Vals Web Search Index
+# Source Notes: Vals Web Search Index
 
-## 原始来源与时间
+## Source and snapshot
 
-- 发布者：Vals AI，第三方商业评测机构。
-- [原始榜单与方法](https://www.vals.ai/benchmarks/web_search)
-- 来源更新日期：**2026-10-21**。
-- 本次核验：**2026-11-06**，HTTP 200。
+Vals AI is a third-party commercial evaluation organization. Its [leaderboard and methodology](https://www.vals.ai/benchmarks/web_search) report an update date of **2026-10-21**.
 
-## 评测口径
+Recorded source check: **2026-11-06**; the page returned HTTP 200.
 
-- 比较 9 个**模型＋搜索工具组合**，工具为 Exa、Keenable 及模型供应商的 Native 搜索。
-- 金融：FAB v2，450 题、9 类任务；采用类别平衡的部分得分，关键条件失败则该题零分。
-- 法律：208 道专家编写题目；主指标为所有评分条件全部通过。
-- 移除 SEC EDGAR、CourtListener 等原任务中的领域专用搜索工具，仅保留通用网页搜索。
-- 使用共同 agent harness；不能把不同模型的组合成绩解释为只改变搜索工具的因果效果。
-- 法律评分使用 GPT-5.4；金融使用 GPT-5.4、Gemini-3.1-Pro、Claude Sonnet 4.6 三模型评审。
+## Evaluation scope
 
-## 原始组合排名
+The benchmark compares 9 **model-search tool combinations** using Exa, Keenable, and model providers' Native search. A common agent harness is used, but scores from different models do not isolate the causal effect of changing only the search tool.
 
-Overall 及顺序直接引用来源，不与 AA 指数合并。
+Finance uses FAB v2: 450 questions across 9 task categories, with category-balanced partial credit. Failure on a critical condition gives the question a zero score. Law uses 208 expert-written questions, with the primary metric requiring all grading conditions to pass.
 
-| 原榜名次 | 模型             | 工具     | Overall | 每任务成本 | 每任务耗时 |
-| -------- | ---------------- | -------- | ------- | ---------- | ---------- |
-| 1        | GPT-5.6 Sol      | Keenable | 49.08%  | $8.84      | 6m35s      |
-| 2        | Claude Fable 5   | Exa      | 48.45%  | $3.48      | 5m52s      |
-| 3        | Claude Fable 5   | Native   | 46.94%  | $4.37      | 12m22s     |
-| 4        | GPT-5.6 Sol      | Exa      | 45.24%  | $18.97     | 8m51s      |
-| 5        | GPT-5.6 Sol      | Native   | 43.58%  | $0.95      | 5m29s      |
-| 6        | Gemini 3.5 Flash | Exa      | 41.36%  | $1.18      | 3m17s      |
-| 7        | Grok 4.5         | Exa      | 38.75%  | $0.58      | 100.93s    |
-| 8        | Gemini 3.5 Flash | Native   | 37.04%  | $0.50      | 4m10s      |
-| 9        | Grok 4.5         | Native   | 35.54%  | $0.99      | 2m17s      |
+Domain-specific search tools from the original tasks, such as SEC EDGAR and CourtListener, are removed, leaving only general web search. Legal grading uses GPT-5.4; financial grading uses a three-model panel of GPT-5.4, Gemini-3.1-Pro, and Claude Sonnet 4.6.
 
-成本是模型＋工具的每任务成本，不是搜索 API 单次报价。
+## Published combination ranking
 
-## 采用边界
+Overall scores and order are taken directly from the source. They are not combined with AA's index.
 
-作为[最终索引](../README.md)的金融／法律补榜，不替代通用搜索榜。覆盖只有 3 类工具，Keenable 仅在 GPT-5.6 Sol 组合中出现，不能据此断言其跨模型通用搜索第一。
+| Source rank | Model            | Tool     | Overall | Cost per task | Time per task |
+| ----------- | ---------------- | -------- | ------- | ------------- | ------------- |
+| 1           | GPT-5.6 Sol      | Keenable | 49.08%  | $8.84         | 6m35s         |
+| 2           | Claude Fable 5   | Exa      | 48.45%  | $3.48         | 5m52s         |
+| 3           | Claude Fable 5   | Native   | 46.94%  | $4.37         | 12m22s        |
+| 4           | GPT-5.6 Sol      | Exa      | 45.24%  | $18.97        | 8m51s         |
+| 5           | GPT-5.6 Sol      | Native   | 43.58%  | $0.95         | 5m29s         |
+| 6           | Gemini 3.5 Flash | Exa      | 41.36%  | $1.18         | 3m17s         |
+| 7           | Grok 4.5         | Exa      | 38.75%  | $0.58         | 100.93s       |
+| 8           | Gemini 3.5 Flash | Native   | 37.04%  | $0.50         | 4m10s         |
+| 9           | Grok 4.5         | Native   | 35.54%  | $0.99         | 2m17s         |
 
-来源的 Native 指各模型供应商自带搜索，不是本项目的 `native` 实现。专业领域、评分规则、模型和成本口径均与 AA 不同，不进行跨榜平均或名次加权。
+Costs include both model and tool use per task. They are not prices for individual search API calls.
+
+## Use and limitations
+
+The [WebSearch index](../README.md) uses Vals as a finance and law supplement, not a replacement for a general-search benchmark. Coverage includes only 3 tool categories, and Keenable appears only with GPT-5.6 Sol. These results do not establish that Keenable ranks first in general search across models.
+
+Native means each model provider's built-in search, not this project's `native` implementation. Domains, grading rules, models, and cost definitions differ from AA's. Scores are not averaged across the two benchmarks, and ranks are not combined through weighting.

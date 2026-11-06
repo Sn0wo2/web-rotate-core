@@ -1,27 +1,23 @@
-# 来源整理：SIGIR 2023 Web Content Extraction Benchmark
+# Source Notes: SIGIR 2023 Web Content Extraction Benchmark
 
-## 原始来源与时间
+## Source and snapshot
 
-- 论文：_An Empirical Comparison of Web Content Extraction Algorithms_。
-- 作者：Janek Bevendorff、Sanket Gupta、Johannes Kiesel、Benno Stein。
-- [ACM SIGIR 2023 论文](https://doi.org/10.1145/3539618.3591920)，出版日期 **2023-07-18**。
-- [原始代码、数据与结果](https://github.com/chatnoir-eu/web-content-extraction-benchmark)
-- [Crossref 出版信息](https://api.crossref.org/works/10.1145/3539618.3591920)
-- 本次核验：**2026-11-06**，Crossref 与仓库 README API 均 HTTP 200。
+The paper _An Empirical Comparison of Web Content Extraction Algorithms_, by Janek Bevendorff, Sanket Gupta, Johannes Kiesel, and Benno Stein, was published at ACM SIGIR 2023 on **2023-07-18**.
 
-## 方法与可复现材料
+Sources: [paper](https://doi.org/10.1145/3539618.3591920), [code, data, and results](https://github.com/chatnoir-eu/web-content-extraction-benchmark), and [Crossref publication metadata](https://api.crossref.org/works/10.1145/3539618.3591920).
 
-这是一项网页主内容抽取算法的可复现比较研究，将 8 个已有标注数据集合并为统一格式。
+Recorded source check: **2026-11-06**; Crossref and the repository README API both returned HTTP 200.
 
-- `datasets/combined.tar.xz`：统一格式的数据。
-- `outputs/model-outputs`：原研究抽取输出的压缩包。
-- `wceb` CLI：执行抽取、评分及聚合。
-- 指标：ROUGE-LSum、Levenshtein；不是依据本项目编写的 LLM 评分规则。
+## Methodology and reproducibility
 
-## 采用边界
+This reproducible comparison of main-content extraction algorithms combines 8 existing annotated datasets into one format. The published materials include `datasets/combined.tar.xz` for the unified data, `outputs/model-outputs` for archives of the study's extraction outputs, and the `wceb` CLI for extraction, scoring, and aggregation.
 
-学术发表、标注数据、代码及原始抽取结果使其适合评估**静态 HTML 的正文提取／去模板算法**。
+Metrics are ROUGE-LSum and Levenshtein, rather than project-authored LLM judging rules.
 
-它不衡量实时网络可达率、反爬绕过或 JavaScript 渲染，也不是 Firecrawl、Tavily、Exa、Jina 等商业 WebFetch API 的供应商总榜。不能把算法结果套到使用不同抓取及清理管线的 API 上。
+## Use and limitations
 
-因此[最终索引](../README.md)仅将它列为正文抽取研究参考，不用它填补商业供应商名次。其研究时间也不能冒充 2026 年的实时 API 测试。
+The academic publication, annotated data, code, and original extraction outputs make this a useful reference for **static HTML main-content extraction and boilerplate removal algorithms**.
+
+It does not measure live network access, anti-bot bypass, or JavaScript rendering. It is not an overall provider ranking for commercial WebFetch APIs such as Firecrawl, Tavily, Exa, or Jina. Algorithm results cannot be transferred to APIs with different fetching and cleanup pipelines.
+
+The [WebFetch index](../README.md) lists it only as content-extraction research, not as a way to fill gaps in commercial-provider ranks. A study from 2023 must not be presented as a live API test from 2026.

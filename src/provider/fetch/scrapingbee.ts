@@ -5,7 +5,7 @@ import { fetchOne, providerResult } from "./utils"
 
 export const scrapingbee = {
   id: "scrapingbee",
-  weight: 85,
+  weight: 85.2,
   formats: ["html", "markdown", "text"],
   run: fetchOne<Record<string, unknown>>(async ({ settings, key, url, signal, format }) => {
     const params: Record<string, unknown> = {

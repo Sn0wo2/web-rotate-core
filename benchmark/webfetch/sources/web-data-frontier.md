@@ -1,52 +1,50 @@
-# 来源整理：String Web Data Frontier Benchmark
+# Source Notes: String Web Data Frontier Benchmark
 
-## 原始来源与时间
+## Source and snapshot
 
-- 发布者：String，同时是参评供应商，**属于厂商自办评测**；其原榜排名第一。
-- [原始仓库、榜单与说明](https://github.com/usestring/web-data-frontier-benchmark)，MIT 许可。
-- [日期固定的原始结果 JSON](https://github.com/usestring/web-data-frontier-benchmark/blob/main/official_results/benchmark-2026-10-30T18-48-18-489Z.json)
-- [原始结果直接下载](https://raw.githubusercontent.com/usestring/web-data-frontier-benchmark/main/official_results/benchmark-2026-10-30T18-48-18-489Z.json)
-- [评分代码](https://github.com/usestring/web-data-frontier-benchmark/blob/main/src/check.ts)、[执行代码](https://github.com/usestring/web-data-frontier-benchmark/blob/main/src/runner.ts)、[目标及预期文本](https://github.com/usestring/web-data-frontier-benchmark/blob/main/src/tests.const.ts)
-- 结果时间：**2026-10-30T18:48:18.489Z**。
-- 本次核验：**2026-11-06**，README、代码及原始 JSON 均成功读取；原始 JSON HTTP 200。
+String publishes this benchmark, participates in it, and ranks first. **This is a vendor-run evaluation.** The [repository, leaderboard, and documentation](https://github.com/usestring/web-data-frontier-benchmark) use the MIT license.
 
-## 测量对象与方法
+The results are dated **2026-10-30T18:48:18.489Z**. Available materials include the [dated raw JSON](https://github.com/usestring/web-data-frontier-benchmark/blob/main/official_results/benchmark-2026-10-30T18-48-18-489Z.json), [direct JSON download](https://raw.githubusercontent.com/usestring/web-data-frontier-benchmark/main/official_results/benchmark-2026-10-30T18-48-18-489Z.json), [scoring code](https://github.com/usestring/web-data-frontier-benchmark/blob/main/src/check.ts), [runner](https://github.com/usestring/web-data-frontier-benchmark/blob/main/src/runner.ts), and [targets with expected text](https://github.com/usestring/web-data-frontier-benchmark/blob/main/src/tests.const.ts).
 
-测量受反爬保护网页的获取能力，不测主内容完整度、噪声、表格结构或 Markdown 可用性。
+Recorded source check: **2026-11-06**; the README, code, and raw JSON were successfully read. The raw JSON returned HTTP 200.
 
-来源原文：
+## What it measures
+
+The benchmark measures the ability to fetch pages protected by anti-bot systems. It does not measure main-content completeness, noise, table structure, or Markdown usability.
+
+The source defines success as follows:
 
 > a request **passes** when the API returns a `2xx` status **and** the response body contains the page's expected text.
 
-- 100 个固定 URL，覆盖 16 个行业。
-- 每家每个 URL 请求 5 次；17 家共 8,500 次请求。
-- 默认并发 2，单次超时 90 秒。
-- 供应商：string、scrapedo、context_dev、scrapfly、scrapingbee、firecrawl、zyte、apify、scraperapi、bright、decodo、nimble、oxylabs、browserbase、zenrows、scrapingant、scrapingdog。
-- 每个目标有 `containsText` 检查，避免仅以 HTTP 200 当成功，但不能由一个预期文本片段推断正文完整或干净。
+There are 100 fixed URLs across 16 industries. Each of 17 providers makes five requests per URL, for 8,500 requests in total. Default concurrency is 2, with a 90-second timeout per request.
 
-## 原始数据核验
+The providers are string, scrapedo, context_dev, scrapfly, scrapingbee, firecrawl, zyte, apify, scraperapi, bright, decodo, nimble, oxylabs, browserbase, zenrows, scrapingant, and scrapingdog.
 
-本次下载 JSON 后重新汇总公开的逐次 `attempts[].success`，只验证原站统计，没有自行制定评分规则或补跑供应商请求。
+Each target has a `containsText` check, so HTTP 200 alone does not count as success. Finding one expected text fragment still does not establish that the main content is complete or clean.
 
-| 检查项                 | 核验结果 |
-| ---------------------- | -------- |
-| 供应商数               | 17       |
-| 每家目标数             | 100      |
-| 每目标尝试数           | 5        |
-| 每家请求数             | 500      |
-| 总请求数               | 8,500    |
-| 逐次成功数与每家汇总值 | 全部一致 |
+## Recorded raw-data verification
 
-原始 JSON 保留逐次成功标记、延迟及错误，但不包含全部成功页面正文，不能据此独立复核每个页面的内容质量。完整成功率及原榜名次见[最终索引](../README.md)。
+During the source review, the downloaded JSON's public per-attempt `attempts[].success` values were reaggregated to check the published totals. No new scoring rules were introduced and no additional provider requests were run.
 
-## 延迟口径
+| Check                                             | Result      |
+| ------------------------------------------------- | ----------- |
+| Providers                                         | 17          |
+| Targets per provider                              | 100         |
+| Attempts per target                               | 5           |
+| Requests per provider                             | 500         |
+| Total requests                                    | 8,500       |
+| Per-attempt success counts versus provider totals | All matched |
 
-原站 Latency score 不是简单的全局平均或全局 p75：先按目标取成功尝试的 nearest-rank p75，再在目标之间等权平均。某供应商在目标上全失败时，使用其他成功供应商在该目标上的分数 p75 填充；全部失败才使用 90 秒。
+The raw JSON includes per-attempt success flags, latency, and errors, but not the full bodies of all successful pages. It therefore cannot support an independent content-quality review of every page. See the [WebFetch index](../README.md) for all success rates and source ranks.
 
-因此最终索引不把该延迟分数混入成功率，也不将其当作本项目实测延迟。
+## Latency definition
 
-## 利益冲突与采用边界
+The source's Latency score is neither a global mean nor a global p75. It first takes the nearest-rank p75 of successful attempts for each target, then averages equally across targets. When a provider fails every attempt on a target, its score is filled with the p75 of the scores of other providers that succeeded on that target. The 90-second fallback applies only when all providers fail.
 
-目标由发布者选择，发布者自身排名第一；不同产品的默认套餐、服务端升级及渲染行为不一定完全可比。Massive 因账户未及时开通未参评，不能视为零分。
+The WebFetch index keeps this latency score separate from success rates and does not present it as latency measured by this project.
 
-优点是代码、目标及逐次结果公开。限制是发布方有直接商业利益，成功判定也不测正文质量。仅保留为**可达率分榜**，不称作独立权威总榜，不直接用其名次推荐所有 WebFetch 产品。
+## Conflicts of interest and limitations
+
+The publisher selects the targets and ranks its own product first. Default plans, server-side upgrades, and rendering behavior may not be fully comparable across products. Massive did not participate because its account was not activated in time; this is not a zero score.
+
+Public code, targets, and per-attempt results make the statistics auditable. The publisher still has a direct commercial interest, and the success criterion does not measure main-content quality. This source is retained only as a **fetch-success ranking**, not an independent authoritative overall ranking or a recommendation order for all WebFetch products.
