@@ -39,61 +39,61 @@ The default weights are based on the [WebSearch Rank Index](./benchmark/websearc
 ### WebSearch
 
 - [Perplexity](https://www.perplexity.ai)
+- [Exa](https://exa.ai) `Keyless`
 - [Octen](https://octen.ai)
-- [Tavily](https://www.tavily.com) `Keyless`
 - [Parallel](https://parallel.ai) `Keyless`
+- [Brave Search](https://brave.com/search/api)
 - [You.com](https://you.com)
 - [Nimble](https://nimbleway.com)
-- [Exa](https://exa.ai) `Keyless`
-- [Brave Search](https://brave.com/search/api)
-- [HyperBrowser](https://hyperbrowser.ai)
+- [OpenAI](https://openai.com)
 - [Firecrawl](https://www.firecrawl.dev) `Keyless`
 - [TinyFish](https://www.tinyfish.ai)
-- [Keenable](https://keenable.ai) `Keyless`
-- [Serper](https://serper.dev)
-- [Bocha](https://bochaai.com)
-- [Jina](https://jina.ai)
-- [ScrapingBee](https://www.scrapingbee.com)
-- [Diffbot](https://www.diffbot.com)
-- [Bright Data](https://brightdata.com)
-- [Apify](https://apify.com)
-- [Linkup](https://www.linkup.so)
-- [Doubao](https://www.volcengine.com)
 - [DeepSeek](https://www.deepseek.com)
-- [OpenAI](https://openai.com)
+- [Linkup](https://www.linkup.so)
+- [Tavily](https://www.tavily.com) `Keyless`
+- [Serper](https://serper.dev)
+- [Keenable](https://keenable.ai) `Keyless`
+- [Zhipu](https://open.bigmodel.cn)
+- [Jina](https://jina.ai)
+- [Bocha](https://bochaai.com)
+- [Apify](https://apify.com)
+- [Doubao](https://www.volcengine.com)
 - [Grok](https://x.ai)
 - [Claude](https://www.anthropic.com)
 - [Gemini](https://ai.google.dev)
+- [Diffbot](https://www.diffbot.com)
+- [Bright Data](https://brightdata.com)
+- [ScrapingBee](https://www.scrapingbee.com)
+- [HyperBrowser](https://hyperbrowser.ai)
 - Native built-in implementation `Keyless`
-- [Zhipu](https://open.bigmodel.cn)
 
 ### WebFetch
 
-- [Tavily](https://www.tavily.com) `Keyless`
-- [Parallel](https://parallel.ai) `Keyless`
-- [You.com](https://you.com)
-- [Exa](https://exa.ai)
-- [HyperBrowser](https://hyperbrowser.ai)
+- [ScrapFly](https://scrapfly.io)
+- [ScrapingBee](https://www.scrapingbee.com)
 - [Firecrawl](https://www.firecrawl.dev) `Keyless`
+- [Parallel](https://parallel.ai) `Keyless`
+- [Apify](https://apify.com)
+- [Exa](https://exa.ai)
+- [Bright Data](https://brightdata.com)
 - [TinyFish](https://www.tinyfish.ai)
-- [Jina](https://jina.ai) `Keyless`
-- [Keenable](https://keenable.ai) `Keyless`
+- [Tavily](https://www.tavily.com) `Keyless`
 - [Nimble](https://nimbleway.com)
+- [You.com](https://you.com)
+- [Jina](https://jina.ai) `Keyless`
+- [Linkup](https://www.linkup.so)
+- [Diffbot](https://www.diffbot.com)
+- [Keenable](https://keenable.ai) `Keyless`
 - [Octen](https://octen.ai)
 - [Serper](https://serper.dev)
-- [ScrapingAnt](https://scrapingant.com)
-- [ScrapingBee](https://www.scrapingbee.com)
-- [ScrapFly](https://scrapfly.io)
-- [Diffbot](https://www.diffbot.com)
-- [Bright Data](https://brightdata.com)
-- [Apify](https://apify.com)
-- [Linkup](https://www.linkup.so)
+- [Zhipu](https://open.bigmodel.cn)
+- [HyperBrowser](https://hyperbrowser.ai)
 - [DeepSeek](https://www.deepseek.com)
 - [Bocha](https://bochaai.com)
 - [Doubao](https://www.volcengine.com)
 - [Claude](https://www.anthropic.com)
 - [Gemini](https://ai.google.dev)
+- [ScrapingAnt](https://scrapingant.com)
 - Native built-in implementation `Keyless`
-- [Zhipu](https://open.bigmodel.cn)
 
 If none of these providers meet your needs, you can also easily extend `core` with your own provider.

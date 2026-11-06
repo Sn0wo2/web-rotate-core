@@ -92,7 +92,7 @@ const SERP_ENGINES: ((query: string, count: number, signal: AbortSignal) => Prom
 
 export const native = {
   id: "native",
-  weight: 70,
+  weight: 0,
   keyless: true,
   run: async ({ queries, signal, globals }) => {
     const count = clamp(globals.searchResults, 1, 100)

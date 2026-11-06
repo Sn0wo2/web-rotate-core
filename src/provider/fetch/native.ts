@@ -9,7 +9,7 @@ const HTML_TAG_PATTERN = /<\/?[a-z][\w:-]*(?:\s[^<>]*?)?>/i
 
 export const native = {
   id: "native",
-  weight: 70,
+  weight: 0,
   keyless: true,
   formats: ["text", "html"],
   run: async ({ urls, signal, globals }) =>
