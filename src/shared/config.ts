@@ -1,5 +1,5 @@
+import { LRUCache } from "lru-cache"
 import { z } from "zod"
-import { LRUCache } from "./lru"
 
 export class RotateConfigError extends Error {
   constructor(
@@ -15,18 +15,24 @@ export function stringValue(value: unknown): string | undefined {
   return typeof value === "string" ? value.trim() || undefined : undefined
 }
 
-const STRING_LIST_SEPARATOR = /[\s,;]+/
+export const CLEANUP_ENGINES = [
+  "none",
+  "defuddle",
+  "readability",
+  "article-extractor",
+  "mercury",
+  "trafilatura",
+  "firecrawl-html",
+] as const
 
-export function stringList(value: unknown): string[] {
-  return (Array.isArray(value) ? value : [value]).flatMap((item) =>
-    typeof item === "string" ? item.split(STRING_LIST_SEPARATOR).filter(Boolean) : [],
-  )
-}
+export type CleanupEngine = (typeof CLEANUP_ENGINES)[number]
+
+export const cleanupEngineSchema = z.enum(CLEANUP_ENGINES)
 
 export const globalsSchema = z.object({
   cacheWindowSeconds: z.coerce.number().transform(Math.trunc).pipe(z.number().nonnegative()).catch(0),
-  cache: z.instanceof(LRUCache).optional(),
-  cleanup: z.enum(["none", "defuddle"]).catch("none"),
+  cache: z.custom<LRUCache<string, NonNullable<unknown>>>((value) => value instanceof LRUCache).optional(),
+  cleanup: cleanupEngineSchema.catch("none"),
   prefer: z.enum(["keyed", "keyless"]).catch("keyless"),
   concurrency: z.coerce.number().transform(Math.trunc).pipe(z.number().positive()).catch(4),
   maxAttempts: z.coerce.number().transform(Math.trunc).pipe(z.number().positive()).catch(3),
