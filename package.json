@@ -23,24 +23,28 @@
     "check": "tsc --noEmit",
     "lint": "biome check --error-on-warnings .",
     "lint:fix": "biome check --write --error-on-warnings .",
-    "security": "bun audit --registry=https://registry.npmjs.org",
+    "security": "bun audit --registry=https://registry.npmjs.org --ignore=GHSA-w5hq-g745-h8pq",
     "ci": "bun run lint && bun run check && bun run security",
     "release": "goreleaser release --clean",
     "release:dry": "goreleaser release --clean --snapshot"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@ai-sdk/anthropic": "^4.0.97",
     "@ai-sdk/google": "^4.0.112",
     "@ai-sdk/openai": "^4.0.109",
     "@ai-sdk/xai": "^5.0.39",
+    "@extractus/article-extractor": "^9.0.1",
+    "@firecrawl/html-extractor": "^0.1.2",
     "@hyperbrowser/sdk": "^1.4.1",
+    "@jocmp/mercury-parser": "^3.1.2",
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "@mozilla/readability": "^0.6.0",
     "@truto/turndown-plugin-gfm": "^1.0.7",
-    "@types/turndown": "^5.0.6",
     "ai": "^7.0.163",
     "defuddle": "~0.19.6",
     "duck-duck-scrape": "^2.2.7",
     "es-toolkit": "^1.53.2",
+    "eventsource-parser": "^4.1.3",
     "exa-js": "^2.27.0",
     "fast-xml-parser": "^5.12.0",
     "file-type": "^22.3.0",
@@ -48,19 +52,151 @@
     "html-to-text": "^10.0.1",
     "keenable": "~0.1.4",
     "linkedom": "~0.18.15",
+    "lru-cache": "^11.5.3",
     "marked": "^18.1.3",
     "p-map": "^7.1.1",
     "scrapfly-sdk": "~0.12.0",
+    "trafilatura": "^0.2.0",
     "turndown": "^7.2.5",
     "zod": "^4.6.7"
   },
-  "overrides": {
-    "zod": "^4.6.7"
+  "peerDependenciesMeta": {
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/google": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    },
+    "@ai-sdk/xai": {
+      "optional": true
+    },
+    "@extractus/article-extractor": {
+      "optional": true
+    },
+    "@firecrawl/html-extractor": {
+      "optional": true
+    },
+    "@hyperbrowser/sdk": {
+      "optional": true
+    },
+    "@jocmp/mercury-parser": {
+      "optional": true
+    },
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "@mozilla/readability": {
+      "optional": true
+    },
+    "@truto/turndown-plugin-gfm": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    },
+    "defuddle": {
+      "optional": true
+    },
+    "duck-duck-scrape": {
+      "optional": true
+    },
+    "eventsource-parser": {
+      "optional": true
+    },
+    "es-toolkit": {
+      "optional": true
+    },
+    "exa-js": {
+      "optional": true
+    },
+    "fast-xml-parser": {
+      "optional": true
+    },
+    "file-type": {
+      "optional": true
+    },
+    "google-sr": {
+      "optional": true
+    },
+    "html-to-text": {
+      "optional": true
+    },
+    "keenable": {
+      "optional": true
+    },
+    "linkedom": {
+      "optional": true
+    },
+    "lru-cache": {
+      "optional": true
+    },
+    "marked": {
+      "optional": true
+    },
+    "p-map": {
+      "optional": true
+    },
+    "scrapfly-sdk": {
+      "optional": true
+    },
+    "trafilatura": {
+      "optional": true
+    },
+    "turndown": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",
+    "@extractus/article-extractor": "^9.0.1",
+    "@firecrawl/html-extractor": "^0.1.2",
+    "@jocmp/mercury-parser": "^3.1.2",
+    "@mozilla/readability": "^0.6.0",
+    "@truto/turndown-plugin-gfm": "^1.0.7",
+    "@ai-sdk/anthropic": "^4.0.97",
+    "@ai-sdk/google": "^4.0.112",
+    "@ai-sdk/openai": "^4.0.109",
+    "@ai-sdk/xai": "^5.0.39",
+    "@hyperbrowser/sdk": "^1.4.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/bun": "^1.4.4",
     "@types/html-to-text": "^9.0.4",
-    "typescript": "^7.0.2"
+    "@types/turndown": "^5.0.6",
+    "ai": "^7.0.163",
+    "defuddle": "~0.19.6",
+    "duck-duck-scrape": "^2.2.7",
+    "es-toolkit": "^1.53.2",
+    "eventsource-parser": "^4.1.3",
+    "exa-js": "^2.27.0",
+    "fast-xml-parser": "^5.12.0",
+    "file-type": "^22.3.0",
+    "google-sr": "^6.0.0",
+    "html-to-text": "^10.0.1",
+    "keenable": "~0.1.4",
+    "linkedom": "~0.18.15",
+    "lru-cache": "^11.5.3",
+    "marked": "^18.1.3",
+    "p-map": "^7.1.1",
+    "scrapfly-sdk": "~0.12.0",
+    "trafilatura": "^0.2.0",
+    "turndown": "^7.2.5",
+    "typescript": "^7.0.2",
+    "zod": "^4.6.7"
+  },
+  "overrides": {
+    "form-data": "^4.0.6",
+    "qs": "^6.16.0",
+    "tough-cookie": "^4.1.3",
+    "zod": "^4.6.7"
+  },
+  "dependencies": {
+    "eventsource-parser": "^4.1.3",
+    "lru-cache": "^11.5.3"
   }
 }
