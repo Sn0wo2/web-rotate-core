@@ -1,10 +1,10 @@
 import { chunk, orderBy, uniq } from "es-toolkit/array"
 import { clamp } from "es-toolkit/math"
+import type { LRUCache } from "lru-cache"
+import pMap from "p-map"
 import { globalsSchema, RotateConfigError } from "../../shared/config"
 import { HTTPError, timedSignal } from "../../shared/http"
-import type { LRUCache } from "../../shared/lru"
 import type { URLList } from "../../shared/types"
-import { mapConcurrent } from "../../shared/utils"
 import { providerRoutes, resolveProviderEntries } from "../rotation"
 import type { AttemptDiagnostics, ProviderEntry, ProviderUsage } from "../types"
 import { routeAttempt, usageEntry } from "../utils"
@@ -12,7 +12,7 @@ import { SEARCH_PROVIDERS } from "./index"
 import type { SearchOutcome, SearchProvider, SearchProviderConfigBase, SearchResult } from "./types"
 
 export type SearchProviderConfig<P extends readonly SearchProvider[] = []> = {
-  cache?: LRUCache | undefined
+  cache?: LRUCache<string, NonNullable<unknown>> | undefined
   cacheWindowSeconds?: number | undefined
   providers?: (SearchProviderConfigBase<typeof SEARCH_PROVIDERS> & SearchProviderConfigBase<NoInfer<P>>) | undefined
   prefer?: "keyed" | "keyless" | undefined
@@ -23,39 +23,7 @@ export type SearchProviderConfig<P extends readonly SearchProvider[] = []> = {
 
 export type DefaultSearchProviderConfig = SearchProviderConfig
 
-export const DEFAULT_SEARCH_PROVIDER_CONFIG: DefaultSearchProviderConfig = {
-  cacheWindowSeconds: 0,
-  providers: {
-    perplexity: {},
-    octen: {},
-    tavily: {},
-    parallel: {},
-    you: {},
-    nimble: {},
-    exa: {},
-    brave: {},
-    hyperbrowser: {},
-    firecrawl: {},
-    tinyfish: {},
-    keenable: {},
-    serper: {},
-    bocha: {},
-    jina: {},
-    scrapingbee: {},
-    diffbot: {},
-    brightdata: {},
-    apify: {},
-    linkup: {},
-    doubao: {},
-    deepseek: {},
-    openai: {},
-    grok: {},
-    claude: {},
-    gemini: {},
-    native: {},
-    zhipu: {},
-  },
-}
+export const DEFAULT_SEARCH_PROVIDER_CONFIG: DefaultSearchProviderConfig = {}
 
 export async function searchWeb<P extends readonly SearchProvider[] = []>({
   queries,
@@ -69,9 +37,11 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
   implementations?: P | undefined
 }): Promise<SearchOutcome> {
   const globals = globalsSchema.parse(config)
-  const registry = new Map<string, SearchProvider>()
-  for (const provider of [...SEARCH_PROVIDERS, ...(implementations ?? [])]) registry.set(provider.id, provider)
-  const enabled = [...registry.values()]
+  const enabled: SearchProvider[] = [
+    ...new Map(
+      [...SEARCH_PROVIDERS, ...(implementations ?? [])].map((provider) => [provider.id, provider] as const),
+    ).values(),
+  ]
   const entries = resolveProviderEntries(
     enabled,
     config.providers as Record<string, ProviderEntry> | undefined,
@@ -83,7 +53,7 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
     throw new RotateConfigError("search queries must not be empty")
   const uniqueQueries = uniq(queries.map((query) => query.trim()))
   const maxResults = clamp(globals.searchResults, 1, 100)
-  const cache = globals.cache?.enabled ? globals.cache : undefined
+  const cache = globals.cacheWindowSeconds > 0 ? globals.cache : undefined
   const candidates = orderBy(pool, ["weight"], ["desc"])
   const maxAttempts = Math.min(globals.maxAttempts, candidates.length)
   const pending = new Set(uniqueQueries)
@@ -141,7 +111,7 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
   if (cache) {
     const cachedQueries: string[] = []
     for (const query of uniqueQueries) {
-      const cached = cache.get<SearchResult[]>(`search:v1:${maxResults}:${query}`)
+      const cached = cache.get(`search:v1:${maxResults}:${query}`) as SearchResult[] | undefined
       if (!cached) continue
       pending.delete(query)
       cachedQueries.push(query)
@@ -165,7 +135,7 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
     }
     routeTries++
     const groups = chunk([...pending], Math.min(pending.size, route.batchSize ?? 1))
-    const outcomes = await mapConcurrent(
+    const outcomes = await pMap(
       groups,
       async (group) => {
         signal.throwIfAborted()
@@ -192,8 +162,7 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
           }
         }
       },
-      clamp(globals.concurrency, 1, 16),
-      signal,
+      { concurrency: clamp(globals.concurrency, 1, 16), signal },
     )
     signal.throwIfAborted()
     const usageRecord = usageEntry(usage, route, { results: 0 })
@@ -241,7 +210,7 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
         for (const query of outcome.group) {
           const cached = attributed.filter((item) => item.queries.includes(query))
           if (cached.length || !(response.answer || response.citations?.length))
-            cache.set(`search:v1:${maxResults}:${query}`, cached, { ttlSeconds: globals.cacheWindowSeconds })
+            cache.set(`search:v1:${maxResults}:${query}`, cached, { ttl: globals.cacheWindowSeconds * 1000 })
         }
     }
   }
@@ -260,7 +229,7 @@ export async function searchWeb<P extends readonly SearchProvider[] = []>({
     ...(errors.size
       ? {
           errors: [...errors].map(([query, failure]) => {
-            return { query, error: failure.error, provider: failure.provider }
+            return { query, ...failure }
           }),
         }
       : {}),

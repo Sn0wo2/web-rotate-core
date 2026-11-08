@@ -3,7 +3,7 @@ import { pick } from "es-toolkit/object"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import type { Globals } from "../../shared/config"
 import { stringValue } from "../../shared/config"
-import { apiJSON } from "../../shared/http"
+import { apiJSON, webURL } from "../../shared/http"
 import type { URLList } from "../../shared/types"
 import type { ModelResult } from "../ai"
 import { modelMetadata } from "../ai"
@@ -67,20 +67,12 @@ function parseTimestamp(value: unknown): number | undefined {
     : undefined
 }
 
-export function normalizeResults(payload: unknown): SearchResult[] {
+function normalizeResults(payload: unknown): SearchResult[] {
   return firstList(payload)
     .filter(isRecord)
     .flatMap((item): SearchResult[] => {
       const url = URL_KEYS.map((key) => stringValue(item[key])).find((value) => value != null)
-      if (!url) return []
-      const parsed = URL.parse(url)
-      if (
-        !parsed ||
-        (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-        parsed.username ||
-        parsed.password
-      )
-        return []
+      if (!(url && webURL(url))) return []
       const title = TITLE_KEYS.map((key) => stringValue(item[key])).find((value) => value != null)
       const content = CONTENT_KEYS.map((key) => stringValue(item[key])).find((value) => value != null)
       const snippets = compact(
@@ -124,6 +116,28 @@ export function searchResponse(payload: unknown, results?: unknown, answer?: str
     ...(resolvedAnswer ? { answer: resolvedAnswer } : {}),
     ...(metadata ? { metadata } : {}),
   }
+}
+
+export function responseOutputs(payload: unknown): { answers: string[]; sources: Record<string, unknown>[] } {
+  const answers: string[] = []
+  const sources: Record<string, unknown>[] = []
+  const output = isRecord(payload) && Array.isArray(payload.output) ? payload.output : []
+  for (const item of output) {
+    if (!isRecord(item) || item.type !== "message" || !Array.isArray(item.content)) continue
+    for (const part of item.content) {
+      if (!isRecord(part) || part.type !== "output_text") continue
+      const text = stringValue(part.text)
+      if (text) answers.push(text)
+      if (!Array.isArray(part.annotations)) continue
+      for (const annotation of part.annotations) {
+        const url = isRecord(annotation) && annotation.type === "url_citation" ? stringValue(annotation.url) : undefined
+        if (!url) continue
+        const summary = stringValue(annotation.summary)
+        sources.push({ ...annotation, url, ...(summary ? { content: summary } : {}) })
+      }
+    }
+  }
+  return { answers, sources }
 }
 
 export function searchInstructions(

@@ -1,16 +1,16 @@
 import { chunk, keyBy } from "es-toolkit/array"
 import { clamp } from "es-toolkit/math"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
+import pMap from "p-map"
 import type { Globals } from "../../shared/config"
 import { stringValue } from "../../shared/config"
-import { HTTPError, timedSignal } from "../../shared/http"
-import { mapConcurrent } from "../../shared/utils"
+import { HTTPError, timedSignal, webURL } from "../../shared/http"
 import { firstList, responseMetadata } from "../utils"
 import type { FetchFormat, FetchPage, FetchProvider } from "./types"
 
 export function normalizeFetchURL(value: string) {
-  const url = URL.parse(value)
-  if (!url || (url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return undefined
+  const url = webURL(value)
+  if (!url) return undefined
   url.hash = ""
   return url.href
 }
@@ -90,7 +90,7 @@ export async function fetchBatches(
   signal: AbortSignal,
   run: (batch: string[]) => Promise<FetchPage[]>,
 ): Promise<FetchPage[]> {
-  const batches = await mapConcurrent(
+  const batches = await pMap(
     chunk(urls, Math.max(1, size)),
     async (batch) => {
       try {
@@ -105,8 +105,7 @@ export async function fetchBatches(
         })
       }
     },
-    clamp(globals.concurrency, 1, 16),
-    signal,
+    { concurrency: clamp(globals.concurrency, 1, 16), signal },
   )
   return batches.flat()
 }
@@ -122,12 +121,8 @@ export async function fetchManualRedirects(
   const requestSignal = timedSignal(signal)
   let currentURL = url
   for (let redirect = 0; ; redirect++) {
-    const parsedURL = new URL(currentURL)
-    if (parsedURL.protocol !== "http:" && parsedURL.protocol !== "https:") {
-      throw new Error(`${validationLabel}: only http and https URLs are supported`)
-    }
-    if (parsedURL.username || parsedURL.password) {
-      throw new Error(`${validationLabel}: URL credentials are not supported`)
+    if (!webURL(currentURL)) {
+      throw new Error(`${validationLabel}: only credential-free http(s) URLs are supported`)
     }
     const response = await fetch(currentURL, {
       headers,
@@ -167,7 +162,7 @@ export function fetchOne<S>(
   return async ({ settings, key, urls, signal, format, globals }) => {
     const results = new Array<FetchPage | undefined>(urls.length)
     let stopped = false
-    await mapConcurrent(
+    await pMap(
       urls,
       async (url, index) => {
         if (stopped) return
@@ -203,8 +198,7 @@ export function fetchOne<S>(
           }
         }
       },
-      clamp(globals.concurrency, 1, 16),
-      signal,
+      { concurrency: clamp(globals.concurrency, 1, 16), signal },
     )
     return urls.map(
       (url, index) =>

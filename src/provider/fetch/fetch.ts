@@ -1,11 +1,12 @@
 import { orderBy } from "es-toolkit/array"
 import { clamp } from "es-toolkit/math"
 import { omit } from "es-toolkit/object"
+import type { LRUCache } from "lru-cache"
+import pMap from "p-map"
+import type { CleanupEngine } from "../../shared/config"
 import { globalsSchema, RotateConfigError } from "../../shared/config"
 import { HTTPError } from "../../shared/http"
-import type { LRUCache } from "../../shared/lru"
 import type { URLList } from "../../shared/types"
-import { mapConcurrent } from "../../shared/utils"
 import { providerRoutes, resolveProviderEntries } from "../rotation"
 import type { AttemptDiagnostics, ProviderEntry, ProviderUsage } from "../types"
 import { routeAttempt, usageEntry } from "../utils"
@@ -14,10 +15,10 @@ import { FETCH_PROVIDERS } from "./index"
 import type { FetchFormat, FetchOutcome, FetchPage, FetchProvider, FetchProviderConfigBase } from "./types"
 
 export type FetchProviderConfig<P extends readonly FetchProvider[] = []> = {
-  cache?: LRUCache | undefined
+  cache?: LRUCache<string, NonNullable<unknown>> | undefined
   cacheWindowSeconds?: number | undefined
   providers?: (FetchProviderConfigBase<typeof FETCH_PROVIDERS> & FetchProviderConfigBase<NoInfer<P>>) | undefined
-  cleanup?: "none" | "defuddle" | undefined
+  cleanup?: CleanupEngine | undefined
   prefer?: "keyed" | "keyless" | undefined
   concurrency?: number | undefined
   maxAttempts?: number | undefined
@@ -25,37 +26,7 @@ export type FetchProviderConfig<P extends readonly FetchProvider[] = []> = {
 
 export type DefaultFetchProviderConfig = FetchProviderConfig
 
-export const DEFAULT_FETCH_PROVIDER_CONFIG: DefaultFetchProviderConfig = {
-  cacheWindowSeconds: 0,
-  providers: {
-    tavily: {},
-    parallel: {},
-    you: {},
-    exa: {},
-    hyperbrowser: {},
-    firecrawl: {},
-    tinyfish: {},
-    jina: {},
-    keenable: {},
-    nimble: {},
-    octen: {},
-    serper: {},
-    scrapingant: {},
-    scrapingbee: {},
-    scrapfly: {},
-    diffbot: {},
-    brightdata: {},
-    apify: {},
-    linkup: {},
-    deepseek: {},
-    bocha: {},
-    doubao: {},
-    claude: {},
-    gemini: {},
-    native: {},
-    zhipu: {},
-  },
-}
+export const DEFAULT_FETCH_PROVIDER_CONFIG: DefaultFetchProviderConfig = {}
 
 export async function fetchWeb<P extends readonly FetchProvider[] = []>({
   urls,
@@ -71,9 +42,11 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
   implementations?: P | undefined
 }): Promise<FetchOutcome> {
   const globals = globalsSchema.parse(config)
-  const registry = new Map<string, FetchProvider>()
-  for (const provider of [...FETCH_PROVIDERS, ...(implementations ?? [])]) registry.set(provider.id, provider)
-  const enabled = [...registry.values()]
+  const enabled: FetchProvider[] = [
+    ...new Map(
+      [...FETCH_PROVIDERS, ...(implementations ?? [])].map((provider) => [provider.id, provider] as const),
+    ).values(),
+  ]
   const entries = resolveProviderEntries(
     enabled,
     config.providers as Record<string, ProviderEntry> | undefined,
@@ -92,7 +65,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
   )
   if (imageOutcome) return imageOutcome
 
-  const cache = globals.cache?.enabled ? globals.cache : undefined
+  const cache = globals.cacheWindowSeconds > 0 ? globals.cache : undefined
   const candidates = orderBy(
     pool.filter((route) => format !== "html" || route.formats.includes("html")),
     ["weight"],
@@ -105,24 +78,26 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
   const attempts: AttemptDiagnostics[] = []
   const usage = new Map<string, ProviderUsage>()
   let pendingURLs = [...new Set(urls)]
-  if (cache) {
-    const cachedURLs: string[] = []
-    const uncachedURLs: string[] = []
-    for (const url of pendingURLs) {
-      const page = cache.get<FetchPage>(`fetch:v1:${globals.cleanup}:${format}:${url}`)
-      if (page?.content) {
-        pagesByURL.set(url, page)
-        cachedURLs.push(url)
-      } else uncachedURLs.push(url)
-    }
-    pendingURLs = uncachedURLs
-    if (cachedURLs.length)
-      attempts.push({ provider: "cache", keyless: true, urls: cachedURLs, durationMs: 0, ok: true, cached: true })
-  }
   const maxAttempts = Math.min(globals.maxAttempts, candidates.length)
   let routeTries = 0
   for (const route of candidates) {
     if (!pendingURLs.length || routeTries >= maxAttempts) break
+    const cleanup = route.cleanup ?? globals.cleanup
+    if (cache) {
+      const cachedURLs: string[] = []
+      const remaining: string[] = []
+      for (const url of pendingURLs) {
+        const page = cache.get(`fetch:v1:${cleanup}:${format}:${url}`) as FetchPage | undefined
+        if (page?.content) {
+          pagesByURL.set(url, page)
+          cachedURLs.push(url)
+        } else remaining.push(url)
+      }
+      if (cachedURLs.length)
+        attempts.push({ provider: "cache", keyless: true, urls: cachedURLs, durationMs: 0, ok: true, cached: true })
+      pendingURLs = remaining
+      if (!pendingURLs.length) continue
+    }
     const fallbackFormat = route.formats[0]
     if (blocked.has(route.id) || fallbackFormat === undefined) {
       attempts.push({
@@ -143,7 +118,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
     usageRecord.requests++
     try {
       const nativeFormat =
-        globals.cleanup !== "none" && route.formats.includes("html")
+        cleanup !== "none" && route.formats.includes("html")
           ? "html"
           : route.formats.includes(format)
             ? format
@@ -162,7 +137,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
       })
       usageRecord.pages = (usageRecord.pages ?? 0) + routePages.length
       signal.throwIfAborted()
-      const convertedPages = await mapConcurrent(
+      const convertedPages = await pMap(
         routePages,
         async (page) => {
           if (!page.content) return page
@@ -171,14 +146,14 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
             return {
               ...page,
               provider: route.id,
-              ...(page.format === format && (page.format !== "html" || globals.cleanup === "none")
+              ...(page.format === format && (page.format !== "html" || cleanup === "none")
                 ? {}
                 : await (await import("./cleanup")).convertContent(
                     page.content,
                     page.format,
                     page.finalURL ?? page.url,
                     format,
-                    globals.cleanup,
+                    cleanup,
                   )),
             }
           } catch (error) {
@@ -190,8 +165,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
             }
           }
         },
-        clamp(globals.concurrency, 1, 16),
-        signal,
+        { concurrency: clamp(globals.concurrency, 1, 16), signal },
       )
       const routePagesByURL = new Map(convertedPages.map((page) => [page.url, page]))
       if (
@@ -209,7 +183,7 @@ export async function fetchWeb<P extends readonly FetchProvider[] = []>({
         if (page?.content) {
           pagesByURL.set(url, page)
           errorsByURL.delete(url)
-          cache?.set(`fetch:v1:${globals.cleanup}:${format}:${url}`, page, { ttlSeconds: globals.cacheWindowSeconds })
+          cache?.set(`fetch:v1:${cleanup}:${format}:${url}`, page, { ttl: globals.cacheWindowSeconds * 1000 })
         } else {
           if (page?.error) errorsByURL.set(url, page.error)
           nextURLs.push(url)

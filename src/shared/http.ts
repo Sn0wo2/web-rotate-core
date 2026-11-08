@@ -2,8 +2,7 @@ import pkg from "../../package.json" with { type: "json" }
 
 export const REQUEST_TIMEOUT_MS = 30_000
 
-export const LIB_VERSION = pkg.version
-export const USER_AGENT = `web-rotate-core/${LIB_VERSION}`
+export const USER_AGENT = `web-rotate-core/${pkg.version}`
 
 export const TARGET_USER_AGENT =
   "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot"
@@ -23,10 +22,21 @@ export class HTTPError extends Error {
   }
 }
 
+export function webURL(value: string): URL | undefined {
+  const url = URL.parse(value)
+  return url && (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password
+    ? url
+    : undefined
+}
+
+const TRAILING_SLASHES = /\/+$/
+
+export const apiBase = (base: string, path: string): string => `${base.replace(TRAILING_SLASHES, "")}${path}`
+
 export const timedSignal = (signal: AbortSignal, timeoutMs = REQUEST_TIMEOUT_MS): AbortSignal =>
   AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
 
-export async function readBodyLimited(response: Response, maxBytes: number, label = "response"): Promise<Uint8Array> {
+export async function readBodyLimited(response: Response, maxBytes: number, label: string): Promise<Uint8Array> {
   if (Number(response.headers.get("content-length")) > maxBytes) {
     await response.body?.cancel()
     throw new Error(`${label} exceeds the ${maxBytes} byte limit`)
