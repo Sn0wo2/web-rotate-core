@@ -14,9 +14,6 @@ const settingsSchema = z.looseObject({
   api: z.enum(["search", "answer"]).optional(),
   headers: z.record(z.string(), z.string()).optional(),
 })
-type JinaSearchSettings = z.output<typeof settingsSchema>
-const FOOTNOTE_PREFIX = /^\[\^[^\]]+\]:[\t ]*/gm
-const THINK_BLOCK = /<think>[\s\S]*?<\/think>/g
 
 export const jina = {
   id: "jina",
@@ -47,10 +44,12 @@ export const jina = {
           stream: false,
         },
       })
-      const answer = stringValue(get(payload, "choices[0].message.content"))?.replace(THINK_BLOCK, "").trim()
+      const answer = stringValue(get(payload, "choices[0].message.content"))
+        ?.replace(/<think>[\s\S]*?<\/think>/g, "")
+        .trim()
       const sources: SearchResult[] = []
       if (answer)
-        void walkTokens(lexer(answer.replace(FOOTNOTE_PREFIX, "")), (part) => {
+        void walkTokens(lexer(answer.replace(/^\[\^[^\]]+\]:[\t ]*/gm, "")), (part) => {
           if (part.type === "link")
             sources.push({ url: part.href, ...(part.text !== part.href ? { title: part.text } : {}) })
         })
@@ -78,4 +77,4 @@ export const jina = {
         : undefined,
     )
   },
-} satisfies SearchProvider<JinaSearchSettings>
+} satisfies SearchProvider<z.output<typeof settingsSchema>>

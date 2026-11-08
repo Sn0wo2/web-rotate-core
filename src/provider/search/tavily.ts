@@ -1,4 +1,5 @@
 import { clamp } from "es-toolkit/math"
+import { snakeCase } from "es-toolkit/string"
 import { apiJSON, REQUEST_TIMEOUT_MS } from "../../shared/http"
 import { mcpJSON } from "../mcp"
 import { requireKey } from "../utils"
@@ -28,35 +29,7 @@ export const tavily = {
       return searchResponse(payload)
     }
     const { timeout, sessionId, humanId, clientName, maxAgeHours, maxHours, ...options } = providerSettings
-    const requestOptions = Object.fromEntries(
-      Object.entries(options).map(([name, value]) => [
-        (
-          {
-            searchDepth: "search_depth",
-            maxResults: "max_results",
-            includeImages: "include_images",
-            includeImageDescriptions: "include_image_descriptions",
-            includeAnswer: "include_answer",
-            includeRawContent: "include_raw_content",
-            includeDomains: "include_domains",
-            excludeDomains: "exclude_domains",
-            includeDomainsMode: "include_domains_mode",
-            timeRange: "time_range",
-            chunksPerSource: "chunks_per_source",
-            startDate: "start_date",
-            endDate: "end_date",
-            autoParameters: "auto_parameters",
-            includeFavicon: "include_favicon",
-            includeUsage: "include_usage",
-            exactMatch: "exact_match",
-            fetchTimeout: "fetch_timeout",
-            cacheFallback: "cache_fallback",
-            filterByLanguage: "filter_by_language",
-          } as Record<string, string>
-        )[name] ?? name,
-        value,
-      ]),
-    )
+    const requestOptions = Object.fromEntries(Object.entries(options).map(([name, value]) => [snakeCase(name), value]))
     const resolvedClientName = clientName === undefined ? "web-rotate-core" : clientName
     const payload = await apiJSON("https://api.tavily.com/search", signal, {
       key,

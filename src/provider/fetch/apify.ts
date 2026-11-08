@@ -5,7 +5,6 @@ import { requireKey, sdkRequest } from "../utils"
 import type { FetchProvider } from "./types"
 
 const settingsSchema = z.looseObject({ actorId: z.string().optional() })
-type ApifyFetchSettings = z.output<typeof settingsSchema>
 const TRAILING_SLASHES = /\/+$/
 
 export const apify = {
@@ -86,4 +85,4 @@ export const apify = {
       return { url, error: stringValue(item.error) ?? "empty content" }
     })
   },
-} satisfies FetchProvider<ApifyFetchSettings>
+} satisfies FetchProvider<z.output<typeof settingsSchema>>

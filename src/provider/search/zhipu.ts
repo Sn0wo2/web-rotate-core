@@ -2,7 +2,7 @@ import { clamp } from "es-toolkit/math"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import { z } from "zod"
 import { stringValue } from "../../shared/config"
-import { apiJSON } from "../../shared/http"
+import { apiBase, apiJSON } from "../../shared/http"
 import { requireKey } from "../utils"
 import type { SearchProvider } from "./types"
 import { answerResponse, searchResponse } from "./utils"
@@ -13,8 +13,6 @@ const settingsSchema = z.looseObject({
   model: z.string().optional(),
   web_search: z.record(z.string(), z.unknown()).optional(),
 })
-type ZhipuSearchSettings = z.output<typeof settingsSchema>
-const TRAILING_SLASHES = /\/+$/
 
 export const zhipu = {
   id: "zhipu",
@@ -26,7 +24,7 @@ export const zhipu = {
     if (api === "answer") {
       const answerModel = model?.trim()
       if (!answerModel) throw new Error("zhipu answer API requires a non-empty model setting")
-      const payload = await apiJSON(`${baseUrl.replace(TRAILING_SLASHES, "")}/chat/completions`, signal, {
+      const payload = await apiJSON(apiBase(baseUrl, "/chat/completions"), signal, {
         label: "zhipu chat completion",
         body: {
           model: answerModel,
@@ -51,7 +49,7 @@ export const zhipu = {
     }
     if (international) delete body.search_intent
 
-    const payload = await apiJSON(`${baseUrl.replace(TRAILING_SLASHES, "")}/web_search`, signal, {
+    const payload = await apiJSON(apiBase(baseUrl, "/web_search"), signal, {
       label: "zhipu web search",
       body,
       key: requireKey("zhipu", key),
@@ -59,4 +57,4 @@ export const zhipu = {
     const results = isRecord(payload) && Array.isArray(payload.search_result) ? payload.search_result : []
     return searchResponse(payload, results)
   },
-} satisfies SearchProvider<ZhipuSearchSettings>
+} satisfies SearchProvider<z.output<typeof settingsSchema>>

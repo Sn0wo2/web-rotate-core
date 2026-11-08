@@ -7,19 +7,6 @@ import { fetchManualRedirects } from "./utils"
 
 const IMAGE_EXT = /\.(?:avif|bmp|gif|heic|heif|ico|jfif|jpe?g|png|tiff?|webp)$/i
 
-const IMAGE_MIMES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "image/bmp",
-  "image/tiff",
-  "image/x-icon",
-  "image/avif",
-  "image/heic",
-  "image/heif",
-])
-
 export async function fetchImage(
   urls: URLList,
   signal: AbortSignal,
@@ -63,7 +50,24 @@ export async function fetchImage(
     }
     const body = await readBodyLimited(response, Math.floor((5 * 1024 * 1024 * 3) / 4), "native image")
     const mime = (await fileTypeFromBuffer(body))?.mime
-    if (!(mime && IMAGE_MIMES.has(mime))) return failedAttempt("downloaded content is not a supported image")
+    if (
+      !(
+        mime &&
+        [
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+          "image/bmp",
+          "image/tiff",
+          "image/x-icon",
+          "image/avif",
+          "image/heic",
+          "image/heif",
+        ].includes(mime)
+      )
+    )
+      return failedAttempt("downloaded content is not a supported image")
     const base64 = body.toBase64()
     if (base64.length > 5 * 1024 * 1024) return failedAttempt("image exceeds the 5 MB size limit")
     const attempt: AttemptDiagnostics = {

@@ -2,18 +2,16 @@ import { clamp } from "es-toolkit/math"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import { z } from "zod"
 import { stringValue } from "../../shared/config"
-import { apiJSON } from "../../shared/http"
+import { apiBase, apiJSON } from "../../shared/http"
 import { requireKey } from "../utils"
 import type { SearchProvider } from "./types"
-import { answerResponse, searchResponse } from "./utils"
+import { answerResponse, responseOutputs, searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({
   api: z.enum(["search", "answer"]).optional(),
   baseUrl: z.string().optional(),
   model: z.string().optional(),
 })
-type DoubaoSearchSettings = z.output<typeof settingsSchema>
-const TRAILING_SLASHES = /\/+$/
 
 export const doubao = {
   id: "doubao",
@@ -25,7 +23,7 @@ export const doubao = {
       const answerModel = model?.trim()
       if (!answerModel) throw new Error("doubao answer API requires a non-empty model setting")
       const baseUrl = stringValue(configuredBaseUrl) ?? "https://ark.cn-beijing.volces.com/api/v3"
-      const payload = await apiJSON(`${baseUrl.replace(TRAILING_SLASHES, "")}/responses`, signal, {
+      const payload = await apiJSON(apiBase(baseUrl, "/responses"), signal, {
         label: "doubao response",
         body: {
           model: answerModel,
@@ -35,24 +33,7 @@ export const doubao = {
         },
         key: requireKey("doubao", key),
       })
-      const sources: Record<string, unknown>[] = []
-      const answers: string[] = []
-      const output = isRecord(payload) && Array.isArray(payload.output) ? payload.output : []
-      for (const item of output) {
-        if (!isRecord(item) || item.type !== "message" || !Array.isArray(item.content)) continue
-        for (const part of item.content) {
-          if (!isRecord(part) || part.type !== "output_text") continue
-          const text = stringValue(part.text)
-          if (text) answers.push(text)
-          if (Array.isArray(part.annotations)) {
-            for (const annotation of part.annotations) {
-              if (!isRecord(annotation) || annotation.type !== "url_citation") continue
-              const url = stringValue(annotation.url)
-              if (url) sources.push({ ...annotation, url, content: stringValue(annotation.summary) })
-            }
-          }
-        }
-      }
+      const { answers, sources } = responseOutputs(payload)
       const answer = answers.join("\n\n")
       return answerResponse({ answer, response: payload }, sources, answer)
     }
@@ -77,4 +58,4 @@ export const doubao = {
     })
     return searchResponse(payload, results)
   },
-} satisfies SearchProvider<DoubaoSearchSettings>
+} satisfies SearchProvider<z.output<typeof settingsSchema>>

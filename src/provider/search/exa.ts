@@ -12,7 +12,6 @@ const settingsSchema = z.looseObject({
   api: z.enum(["search", "answer"]).optional(),
   contents: z.record(z.string(), z.unknown()).optional(),
 })
-type ExaSearchSettings = z.output<typeof settingsSchema>
 const MCP_RESULT_SEPARATOR = /\n\n---\n\n/
 const URL_LINE = /^URL:\s*(.+)$/m
 const TITLE_LINE = /^Title:\s*(.+)$/m
@@ -85,4 +84,4 @@ export const exa = {
     )
     return searchResponse(payload)
   },
-} satisfies SearchProvider<ExaSearchSettings>
+} satisfies SearchProvider<z.output<typeof settingsSchema>>

@@ -1,8 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
-import { LIB_VERSION, REQUEST_TIMEOUT_MS, timedSignal } from "../shared/http"
+import pkg from "../../package.json" with { type: "json" }
+import { REQUEST_TIMEOUT_MS, timedSignal } from "../shared/http"
 
 export const MCP_FETCH_TIMEOUT_MS = 120_000
 
@@ -16,7 +16,7 @@ export async function mcpCall(
 ): Promise<CallToolResult> {
   const requestSignal = timedSignal(signal, timeoutMs)
   for (let attempt = 0; ; attempt++) {
-    const client = new Client({ name: "web-rotate-core", version: LIB_VERSION }, { capabilities: {} })
+    const client = new Client({ name: "web-rotate-core", version: pkg.version }, { capabilities: {} })
     const transport = new StreamableHTTPClientTransport(new URL(url), {
       requestInit: { headers },
       fetch: (input, init) =>
@@ -29,7 +29,7 @@ export async function mcpCall(
         }),
     })
     try {
-      await client.connect(transport as unknown as Transport, {
+      await client.connect(transport, {
         signal: requestSignal,
       })
       const result = (await client.callTool({ name: tool, arguments: args }, undefined, {

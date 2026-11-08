@@ -1,13 +1,11 @@
 import { clamp } from "es-toolkit/math"
-import { isPlainObject as isRecord } from "es-toolkit/predicate"
+import pMap from "p-map"
 import { z } from "zod"
-import { stringValue } from "../../shared/config"
 import { apiJSON } from "../../shared/http"
-import { mapConcurrent } from "../../shared/utils"
 import { mcpJSON } from "../mcp"
 import { requireKey } from "../utils"
 import type { SearchProvider } from "./types"
-import { answerResponse, searchResponse } from "./utils"
+import { answerResponse, responseOutputs, searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({
   api: z.enum(["search", "answer"]).optional(),
@@ -37,7 +35,7 @@ export const parallel = {
     const { api, mode, advanced_settings, max_results, processor, ...options } = settings
     if (api === "answer") {
       const apiKey = requireKey("parallel", key)
-      const payloads = await mapConcurrent(
+      const payloads = await pMap(
         queries,
         (question) =>
           apiJSON("https://api.parallel.ai/v1/responses", signal, {
@@ -50,22 +48,14 @@ export const parallel = {
               stream: false,
             },
           }),
-        clamp(globals.concurrency, 1, 16),
-        signal,
+        { concurrency: clamp(globals.concurrency, 1, 16), signal },
       )
-      const sources: Record<string, unknown>[] = []
       const answers: string[] = []
+      const sources: Record<string, unknown>[] = []
       for (const payload of payloads) {
-        const output = isRecord(payload) && Array.isArray(payload.output) ? payload.output : []
-        for (const item of output) {
-          if (!isRecord(item) || item.type !== "message" || !Array.isArray(item.content)) continue
-          for (const content of item.content) {
-            if (!isRecord(content) || content.type !== "output_text") continue
-            const text = stringValue(content.text)
-            if (text) answers.push(text)
-            if (Array.isArray(content.annotations)) sources.push(...content.annotations.filter(isRecord))
-          }
-        }
+        const { answers: texts, sources: citations } = responseOutputs(payload)
+        answers.push(...texts)
+        sources.push(...citations)
       }
       const answer = answers.join("\n\n")
       return answerResponse({ answer, responses: payloads }, sources, answer)

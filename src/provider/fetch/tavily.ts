@@ -1,4 +1,5 @@
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
+import { snakeCase } from "es-toolkit/string"
 import { stringValue } from "../../shared/config"
 import { apiJSON, REQUEST_TIMEOUT_MS } from "../../shared/http"
 import { MCP_FETCH_TIMEOUT_MS, mcpJSON } from "../mcp"
@@ -27,18 +28,7 @@ export const tavily = {
     return await fetchBatches(urls, 20, globals, signal, async (batch) => {
       const { timeout, sessionId, humanId, clientName, ...options } = settings
       const requestOptions = Object.fromEntries(
-        Object.entries(options).map(([name, value]) => [
-          (
-            {
-              includeImages: "include_images",
-              extractDepth: "extract_depth",
-              includeFavicon: "include_favicon",
-              includeUsage: "include_usage",
-              chunksPerSource: "chunks_per_source",
-            } as Record<string, string>
-          )[name] ?? name,
-          value,
-        ]),
+        Object.entries(options).map(([name, value]) => [snakeCase(name), value]),
       )
       const response = await apiJSON("https://api.tavily.com/extract", signal, {
         key,

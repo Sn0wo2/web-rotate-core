@@ -9,8 +9,12 @@ export const tinyfish = {
   run: async ({ settings, key, queries, signal }) => {
     const endpoint = urlParams(
       new URL("https://api.search.tinyfish.ai"),
-      { domain_type: "web", ...settings },
-      (_name, value) => (Array.isArray(value) ? value.join(",") : undefined),
+      Object.fromEntries(
+        Object.entries({ domain_type: "web", ...settings }).map(([name, value]) => [
+          name,
+          Array.isArray(value) ? value.join(",") : value,
+        ]),
+      ),
     )
     endpoint.searchParams.set("query", queries[0])
     return searchResponse(

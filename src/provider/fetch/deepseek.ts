@@ -6,14 +6,13 @@ import type { FetchProvider } from "./types"
 import { fetchOne, providerResult } from "./utils"
 
 const settingsSchema = z.strictObject({}).transform((settings): Record<string, unknown> => settings)
-type DeepSeekFetchSettings = z.output<typeof settingsSchema>
 
 export const deepseek = {
   id: "deepseek",
   weight: 55,
   formats: ["markdown"],
   options: settingsSchema,
-  run: fetchOne<DeepSeekFetchSettings>(async ({ key, url, signal }) => {
+  run: fetchOne(async ({ key, url, signal }) => {
     const payload = await apiJSON("https://api.deepseek.com/v1/tools/fetch", signal, {
       body: { url },
       key: requireKey("deepseek", key),

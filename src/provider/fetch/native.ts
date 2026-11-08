@@ -1,6 +1,6 @@
 import { clamp } from "es-toolkit/math"
+import pMap from "p-map"
 import { HTTPError, readBodyLimited, TARGET_USER_AGENT } from "../../shared/http"
-import { mapConcurrent } from "../../shared/utils"
 import type { FetchPage, FetchProvider } from "./types"
 import { fetchManualRedirects } from "./utils"
 
@@ -13,7 +13,7 @@ export const native = {
   keyless: true,
   formats: ["text", "html"],
   run: async ({ urls, signal, globals }) =>
-    mapConcurrent(
+    pMap(
       urls,
       async (url): Promise<FetchPage> => {
         try {
@@ -73,7 +73,6 @@ export const native = {
           }
         }
       },
-      clamp(globals.concurrency, 1, 16),
-      signal,
+      { concurrency: clamp(globals.concurrency, 1, 16), signal },
     ),
 } satisfies FetchProvider

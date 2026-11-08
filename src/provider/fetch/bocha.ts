@@ -6,14 +6,13 @@ import type { FetchProvider } from "./types"
 import { fetchOne, providerResult } from "./utils"
 
 const settingsSchema = z.strictObject({}).transform((settings): Record<string, unknown> => settings)
-type BochaFetchSettings = z.output<typeof settingsSchema>
 
 export const bocha = {
   id: "bocha",
   weight: 55,
   formats: ["markdown"],
   options: settingsSchema,
-  run: fetchOne<BochaFetchSettings>(async ({ key, url, signal }) => {
+  run: fetchOne(async ({ key, url, signal }) => {
     const payload = await apiJSON("https://api.bocha.cn/v1/deepseek-fetch", signal, {
       body: { url },
       key: requireKey("bocha", key),

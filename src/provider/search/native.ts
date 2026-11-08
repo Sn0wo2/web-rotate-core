@@ -2,14 +2,12 @@ import { search as duckDuckGoSearchAPI, SafeSearchType } from "duck-duck-scrape"
 import { clamp } from "es-toolkit/math"
 import { XMLParser } from "fast-xml-parser"
 import { search as googleSearchAPI, OrganicResult } from "google-sr"
+import pMap from "p-map"
 import { checkedResponseText, HTTPError, timedSignal } from "../../shared/http"
-import { mapConcurrent } from "../../shared/utils"
 import type { SearchProvider, SearchResult } from "./types"
 
 const SERP_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-
-const xmlParser = new XMLParser({ ignoreAttributes: true })
 
 const SERP_ENGINES: ((query: string, count: number, signal: AbortSignal) => Promise<SearchResult[]>)[] = [
   async (query, count, signal) => {
@@ -46,7 +44,8 @@ const SERP_ENGINES: ((query: string, count: number, signal: AbortSignal) => Prom
       },
       signal: timedSignal(signal),
     })
-    const channel = xmlParser.parse(await checkedResponseText(response, "bing rss"))?.rss?.channel
+    const channel = new XMLParser({ ignoreAttributes: true }).parse(await checkedResponseText(response, "bing rss"))
+      ?.rss?.channel
     const items: {
       link?: string
       title?: string
@@ -96,7 +95,7 @@ export const native = {
   keyless: true,
   run: async ({ queries, signal, globals }) => {
     const count = clamp(globals.searchResults, 1, 100)
-    const groups = await mapConcurrent(
+    const groups = await pMap(
       queries,
       async (query): Promise<SearchResult[]> => {
         for (const search of SERP_ENGINES) {
@@ -109,8 +108,7 @@ export const native = {
         }
         throw new Error("all native SERP engines failed")
       },
-      clamp(globals.concurrency, 1, 16),
-      signal,
+      { concurrency: clamp(globals.concurrency, 1, 16), signal },
     )
     return { results: groups.flat() }
   },

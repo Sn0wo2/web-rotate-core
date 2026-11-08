@@ -19,7 +19,6 @@ const settingsSchema = z.looseObject({
     })
     .optional(),
 })
-type ParallelFetchSettings = z.output<typeof settingsSchema>
 
 export const parallel = {
   id: "parallel",
@@ -71,4 +70,4 @@ export const parallel = {
       return fetchPages(batch, payload, content, format)
     })
   },
-} satisfies FetchProvider<ParallelFetchSettings>
+} satisfies FetchProvider<z.output<typeof settingsSchema>>

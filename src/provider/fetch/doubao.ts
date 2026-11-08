@@ -13,7 +13,7 @@ export const doubao = {
   weight: 55,
   formats: ["text"],
   options: settingsSchema,
-  run: fetchOne<z.output<typeof settingsSchema>>(async ({ key, url, signal }) => {
+  run: fetchOne(async ({ key, url, signal }) => {
     const payload = await apiJSON("https://open.feedcoopapi.com/search_api/fetch", signal, {
       key: requireKey("doubao", key),
       body: { Url: url },
@@ -37,4 +37,4 @@ export const doubao = {
       ...(finalURL ? { finalURL } : {}),
     }
   }),
-} satisfies FetchProvider<z.output<typeof settingsSchema>>
+} satisfies FetchProvider

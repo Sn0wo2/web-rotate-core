@@ -7,7 +7,6 @@ import type { SearchProvider } from "./types"
 import { searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({ keyless: z.boolean().optional() })
-type FirecrawlSearchSettings = z.output<typeof settingsSchema>
 
 export const firecrawl = {
   id: "firecrawl",
@@ -79,4 +78,4 @@ export const firecrawl = {
       firstList(response.data).map((item) => (item && typeof item === "object" ? item : { url: item })),
     )
   },
-} satisfies SearchProvider<FirecrawlSearchSettings>
+} satisfies SearchProvider<z.output<typeof settingsSchema>>

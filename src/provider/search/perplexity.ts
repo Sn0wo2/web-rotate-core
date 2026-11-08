@@ -1,8 +1,8 @@
 import get from "es-toolkit/compat/get"
 import { clamp } from "es-toolkit/math"
+import pMap from "p-map"
 import { z } from "zod"
 import { apiJSON } from "../../shared/http"
-import { mapConcurrent } from "../../shared/utils"
 import { requireKey } from "../utils"
 import type { SearchProvider } from "./types"
 import { answerResponse, searchResponse } from "./utils"
@@ -23,7 +23,7 @@ export const perplexity = {
     const { api, search_context_size, ...options } = settings
     if (api === "answer") {
       const { search_type, max_tokens_per_page, model, ...answerOptions } = options
-      const responses = await mapConcurrent(
+      const responses = await pMap(
         queries,
         async (query) => {
           const payload = await apiJSON("https://api.perplexity.ai/v1/sonar", signal, {
@@ -43,8 +43,7 @@ export const perplexity = {
           ]
           return answerResponse(payload, sources, get(payload, "choices.0.message.content"))
         },
-        clamp(globals.concurrency, 1, 16),
-        signal,
+        { concurrency: clamp(globals.concurrency, 1, 16), signal },
       )
       const answers = responses.flatMap((response) => (response.answer ? [response.answer] : []))
       const citations = responses.flatMap((response) => response.citations ?? [])

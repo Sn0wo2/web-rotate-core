@@ -1,5 +1,5 @@
 import type { z } from "zod"
-import type { Globals } from "../shared/config"
+import type { CleanupEngine, Globals } from "../shared/config"
 
 export type Provider<Settings = Record<string, unknown>> = {
   id: string
@@ -26,6 +26,7 @@ export type ProviderKey = {
 export type ProviderEntry<Settings = Record<string, unknown>> = {
   keys?: string | readonly (string | ProviderKey)[] | undefined
   weight?: number | undefined
+  cleanup?: CleanupEngine | undefined
 } & Settings
 
 export type ProviderRoute<P extends Provider<unknown>> = P & {
@@ -33,6 +34,7 @@ export type ProviderRoute<P extends Provider<unknown>> = P & {
   tier?: string | undefined
   keyIndex?: number | undefined
   settings: Record<string, unknown>
+  cleanup?: CleanupEngine | undefined
 }
 
 export type AttemptDiagnostics = {

@@ -1,14 +1,17 @@
 import { compact, zip } from "es-toolkit/array"
 import { z } from "zod"
-import type { Globals } from "../shared/config"
-import { RotateConfigError, stringList, stringValue } from "../shared/config"
+import type { CleanupEngine, Globals } from "../shared/config"
+import { cleanupEngineSchema, RotateConfigError, stringValue } from "../shared/config"
 import type { Provider, ProviderEntry, ProviderKey, ProviderRoute } from "./types"
 
-export type ParsedEntry = {
+const STRING_LIST_SEPARATOR = /[\s,;]+/
+
+type ParsedEntry = {
   keys: ProviderKey[]
   keyless?: { tier?: string | undefined; weight?: number | undefined } | undefined
   settings: Record<string, unknown>
   weight: number
+  cleanup?: CleanupEngine | undefined
 }
 
 function parseProviderKeys(value: unknown, label: string): Pick<ParsedEntry, "keys" | "keyless"> {
@@ -18,15 +21,18 @@ function parseProviderKeys(value: unknown, label: string): Pick<ParsedEntry, "ke
   let keyless: ParsedEntry["keyless"]
   const items = (Array.isArray(value) ? value : [value]).flatMap((item) =>
     typeof item === "string"
-      ? stringList(item).map((token) => {
-          const separator = token.indexOf("::")
-          if (separator > 0) {
-            const tier = token.slice(0, separator).trim()
-            const key = token.slice(separator + 2).trim()
-            if (tier && key) return { key, tier }
-          }
-          return { key: token }
-        })
+      ? item
+          .split(STRING_LIST_SEPARATOR)
+          .filter(Boolean)
+          .map((token) => {
+            const separator = token.indexOf("::")
+            if (separator > 0) {
+              const tier = token.slice(0, separator).trim()
+              const key = token.slice(separator + 2).trim()
+              if (tier && key) return { key, tier }
+            }
+            return { key: token }
+          })
       : [item],
   )
   for (const item of items) {
@@ -63,7 +69,16 @@ export function resolveProviderEntries<P extends Provider<unknown>>(
   for (const [id, entry] of Object.entries(slots)) {
     const provider = byID.get(id)
     if (!provider) throw new RotateConfigError(`${label} provider "${id}" is not registered`, "unsupported-provider")
-    const { keys, weight, ...settings } = entry
+    const { keys, weight, cleanup, ...settings } = entry
+    let resolvedCleanup: CleanupEngine | undefined
+    if (cleanup !== undefined) {
+      const parsed = cleanupEngineSchema.safeParse(cleanup)
+      if (!parsed.success)
+        throw new RotateConfigError(
+          `${label} provider "${id}" has an invalid cleanup engine: ${z.prettifyError(parsed.error)}`,
+        )
+      resolvedCleanup = parsed.data
+    }
     let resolved: Record<string, unknown> = settings
     if (provider.options) {
       const parsed = provider.options.safeParse(settings)
@@ -81,6 +96,7 @@ export function resolveProviderEntries<P extends Provider<unknown>>(
       keyless: parsedKeys.keyless,
       settings: resolved,
       weight: weight ?? provider.weight,
+      ...(resolvedCleanup === undefined ? {} : { cleanup: resolvedCleanup }),
     })
   }
   return entries
@@ -111,6 +127,7 @@ export function providerRoutes<P extends Provider<unknown>>(
           ...(parsed.keyIndex === undefined ? {} : { keyIndex: parsed.keyIndex }),
           settings: entry.settings,
           weight: parsed.weight ?? entry.weight,
+          ...(entry.cleanup === undefined ? {} : { cleanup: entry.cleanup }),
         }
       }),
     )

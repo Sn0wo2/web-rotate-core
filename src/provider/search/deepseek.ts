@@ -26,9 +26,7 @@ export const deepseek = {
       }
     },
     (key) => {
-      return {
-        Authorization: `Bearer ${requireKey("deepseek", key)}`,
-      }
+      return { Authorization: `Bearer ${requireKey("deepseek", key)}` }
     },
     (payload) =>
       firstList(payload)

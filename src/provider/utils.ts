@@ -77,25 +77,13 @@ export function responseMetadata(payload: unknown): Record<string, unknown> | un
   return entries.length ? Object.fromEntries(entries) : undefined
 }
 
-export function urlParams(
-  endpoint: URL,
-  options: Record<string, unknown>,
-  encode?: (name: string, value: unknown) => string | readonly [string, string][] | undefined,
-): URL {
+export function urlParams(endpoint: URL, options: Record<string, unknown>): URL {
   for (const [name, value] of Object.entries(options)) {
     if (value == null) continue
-    const encoded = encode?.(name, value)
-    if (encoded != null) {
-      if (typeof encoded === "string") endpoint.searchParams.set(name, encoded)
-      else for (const [key, item] of encoded) endpoint.searchParams.set(key, item)
-      continue
-    }
     if (Array.isArray(value)) {
       for (const item of value) endpoint.searchParams.append(name, String(item))
-    } else if (isRecord(value)) {
-      endpoint.searchParams.set(name, JSON.stringify(value))
     } else {
-      endpoint.searchParams.set(name, String(value))
+      endpoint.searchParams.set(name, isRecord(value) ? JSON.stringify(value) : String(value))
     }
   }
   return endpoint
@@ -112,16 +100,14 @@ export function scrapingbeeURL(path: string, params: Record<string, unknown>): U
     )
       continue
     if (["extract_rules", "js_scenario", "ai_extract_rules"].includes(name) && typeof value !== "string") {
-      urlParams(endpoint, { [name]: value }, (_, item) => JSON.stringify(item))
+      endpoint.searchParams.set(name, JSON.stringify(value))
     } else if (Array.isArray(value)) {
       for (const item of value) if (item != null) endpoint.searchParams.append(`${name}[]`, String(item))
     } else {
-      urlParams(endpoint, { [name]: value }, (parameter, item) => {
-        if (parameter === "js_snippet" && typeof item === "string") {
-          return new TextEncoder().encode(item).toBase64()
-        }
-        return undefined
-      })
+      endpoint.searchParams.set(
+        name,
+        name === "js_snippet" && typeof value === "string" ? new TextEncoder().encode(value).toBase64() : String(value),
+      )
     }
   }
   return endpoint
@@ -133,19 +119,12 @@ export async function sdkRequest<T>(
   timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const gate = timedSignal(signal, timeoutMs)
-  let onAbort: (() => void) | undefined
+  gate.throwIfAborted()
   try {
-    gate.throwIfAborted()
-    return await Promise.race([
-      new Promise<never>((_, reject) => {
-        onAbort = () => reject(gate.reason)
-        gate.addEventListener("abort", onAbort, { once: true })
-      }),
-      Promise.resolve().then(() => {
-        gate.throwIfAborted()
-        return run(gate)
-      }),
-    ])
+    return await new Promise<T>((resolve, reject) => {
+      gate.addEventListener("abort", () => reject(gate.reason), { once: true })
+      run(gate).then(resolve, reject)
+    })
   } catch (error) {
     const failure = error as { status?: unknown; statusCode?: unknown } | null
     const status = failure?.status ?? failure?.statusCode
@@ -154,7 +133,5 @@ export async function sdkRequest<T>(
         cause: error,
       })
     throw error
-  } finally {
-    if (onAbort) gate.removeEventListener("abort", onAbort)
   }
 }

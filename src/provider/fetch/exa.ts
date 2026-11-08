@@ -8,7 +8,6 @@ import { fetchPages } from "./utils"
 const settingsSchema = z.looseObject({
   text: z.record(z.string(), z.unknown()).optional(),
 })
-type ExaFetchSettings = z.output<typeof settingsSchema>
 
 export const exa = {
   id: "exa",
@@ -26,4 +25,4 @@ export const exa = {
     )
     return fetchPages(urls, payload.results, (item) => stringValue(item.text), format)
   },
-} satisfies FetchProvider<ExaFetchSettings>
+} satisfies FetchProvider<z.output<typeof settingsSchema>>

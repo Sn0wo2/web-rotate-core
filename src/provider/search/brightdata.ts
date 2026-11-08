@@ -7,7 +7,6 @@ import type { SearchProvider } from "./types"
 import { searchResponse } from "./utils"
 
 const settingsSchema = z.looseObject({ zone: z.string().optional() })
-type BrightdataSearchSettings = z.output<typeof settingsSchema>
 
 export const brightdata = {
   id: "brightdata",
@@ -47,4 +46,4 @@ export const brightdata = {
           }),
     )
   },
-} satisfies SearchProvider<BrightdataSearchSettings>
+} satisfies SearchProvider<z.output<typeof settingsSchema>>

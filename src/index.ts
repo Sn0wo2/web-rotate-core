@@ -1,3 +1,4 @@
+export { LRUCache } from "lru-cache"
 export type {
   DefaultFetchProviderConfig,
   FetchProviderConfig,
@@ -35,9 +36,7 @@ export type {
   ProviderKey,
   ProviderUsage,
 } from "./provider/types"
-export type { Globals } from "./shared/config"
-export { globalsSchema, RotateConfigError } from "./shared/config"
+export type { CleanupEngine, Globals } from "./shared/config"
+export { CLEANUP_ENGINES, cleanupEngineSchema, globalsSchema, RotateConfigError } from "./shared/config"
 export { HTTPError } from "./shared/http"
-export type { LRUCacheOptions, LRUCacheSetOptions } from "./shared/lru"
-export { LRUCache } from "./shared/lru"
 export type { URLList } from "./shared/types"
