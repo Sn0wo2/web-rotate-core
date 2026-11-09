@@ -1,4 +1,4 @@
-# Pin the official npm registry so bun.lock never records third-party mirror
-# URLs (a mirror outage on CI would break `bun install --frozen-lockfile`).
+
+Mirror outage on CI would break `bun install --frozen-lockfile`.
 [install]
 registry = "https://registry.npmjs.org"
