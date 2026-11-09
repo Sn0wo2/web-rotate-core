@@ -1,4 +1,3 @@
-
-Mirror outage on CI would break `bun install --frozen-lockfile`.
+# Mirror outage on CI would break `bun install --frozen-lockfile`.
 [install]
 registry = "https://registry.npmjs.org"
