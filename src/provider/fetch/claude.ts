@@ -1,5 +1,3 @@
-import { createAnthropic } from "@ai-sdk/anthropic"
-import { generateText } from "ai"
 import { z } from "zod"
 import { modelCallOptions, modelMetadata, modelProviderOptions, modelSettingsSchema } from "../ai"
 import { requireKey, sdkRequest } from "../utils"
@@ -27,13 +25,15 @@ export const claude = {
   run: fetchOne(async ({ settings, key, url, signal, globals }) => {
     const requestedURL = normalizeFetchURL(url)
     if (!requestedURL) throw new Error("web fetch requires a valid HTTP(S) URL")
+    const [{ createAnthropic }, { generateText }] = await Promise.all([import("@ai-sdk/anthropic"), import("ai")])
     const anthropic = createAnthropic({
       apiKey: requireKey("claude", key),
       ...(settings.baseUrl ? { baseURL: settings.baseUrl } : {}),
     })
+    const callOptions = await modelCallOptions(settings)
     const result = await sdkRequest(signal, (abortSignal) =>
       generateText({
-        ...modelCallOptions(settings),
+        ...callOptions,
         model: anthropic(settings.model?.trim() || "claude-sonnet-4-6"),
         system:
           settings.instructions?.trim() ||

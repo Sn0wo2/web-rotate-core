@@ -1,5 +1,3 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import { generateText } from "ai"
 import get from "es-toolkit/compat/get"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
 import type { z } from "zod"
@@ -16,13 +14,15 @@ export const gemini = {
   run: fetchOne(async ({ settings, key, url, signal, format }) => {
     const requestedURL = normalizeFetchURL(url)
     if (!requestedURL) throw new Error("web fetch requires a valid HTTP(S) URL")
+    const [{ createGoogleGenerativeAI }, { generateText }] = await Promise.all([import("@ai-sdk/google"), import("ai")])
     const google = createGoogleGenerativeAI({
       apiKey: requireKey("gemini", key),
       ...(settings.baseUrl ? { baseURL: settings.baseUrl } : {}),
     })
+    const callOptions = await modelCallOptions({ ...settings, max_output_tokens: settings.max_output_tokens ?? 8192 })
     const result = await sdkRequest(signal, (abortSignal) =>
       generateText({
-        ...modelCallOptions({ ...settings, max_output_tokens: settings.max_output_tokens ?? 8192 }),
+        ...callOptions,
         model: google(settings.model?.trim() || "gemini-2.5-flash"),
         system: [
           settings.instructions?.trim(),

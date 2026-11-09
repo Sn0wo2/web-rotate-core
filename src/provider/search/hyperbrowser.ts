@@ -1,4 +1,3 @@
-import { Hyperbrowser } from "@hyperbrowser/sdk"
 import get from "es-toolkit/compat/get"
 import { requireKey, sdkRequest } from "../utils"
 import type { SearchProvider } from "./types"
@@ -8,6 +7,7 @@ export const hyperbrowser = {
   id: "hyperbrowser",
   weight: 45,
   run: async ({ settings, key, queries, signal, globals }) => {
+    const { Hyperbrowser } = await import("@hyperbrowser/sdk")
     const client = new Hyperbrowser({
       apiKey: requireKey("hyperbrowser", key),
       baseUrl: "https://api.hyperbrowser.ai",

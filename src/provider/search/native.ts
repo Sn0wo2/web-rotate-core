@@ -1,7 +1,4 @@
-import { search as duckDuckGoSearchAPI, SafeSearchType } from "duck-duck-scrape"
 import { clamp } from "es-toolkit/math"
-import { XMLParser } from "fast-xml-parser"
-import { search as googleSearchAPI, OrganicResult } from "google-sr"
 import pMap from "p-map"
 import { checkedResponseText, HTTPError, timedSignal } from "../../shared/http"
 import type { SearchProvider, SearchResult } from "./types"
@@ -11,6 +8,7 @@ const SERP_USER_AGENT =
 
 const SERP_ENGINES: ((query: string, count: number, signal: AbortSignal) => Promise<SearchResult[]>)[] = [
   async (query, count, signal) => {
+    const { search: googleSearchAPI, OrganicResult } = await import("google-sr")
     const results = await googleSearchAPI({
       query,
       parsers: [OrganicResult],
@@ -44,6 +42,7 @@ const SERP_ENGINES: ((query: string, count: number, signal: AbortSignal) => Prom
       },
       signal: timedSignal(signal),
     })
+    const { XMLParser } = await import("fast-xml-parser")
     const channel = new XMLParser({ ignoreAttributes: true }).parse(await checkedResponseText(response, "bing rss"))
       ?.rss?.channel
     const items: {
@@ -67,6 +66,7 @@ const SERP_ENGINES: ((query: string, count: number, signal: AbortSignal) => Prom
     )
   },
   async (query, count) => {
+    const { search: duckDuckGoSearchAPI, SafeSearchType } = await import("duck-duck-scrape")
     const results = await duckDuckGoSearchAPI(
       query,
       { safeSearch: SafeSearchType.OFF },

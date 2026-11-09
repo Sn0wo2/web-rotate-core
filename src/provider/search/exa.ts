@@ -1,7 +1,6 @@
 import { clamp } from "es-toolkit/math"
 import { pick } from "es-toolkit/object"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
-import Exa from "exa-js"
 import { z } from "zod"
 import { mcpCall } from "../mcp"
 import { requireKey, sdkRequest } from "../utils"
@@ -27,6 +26,7 @@ export const exa = {
   run: async ({ settings, key, queries, signal, globals }) => {
     const { api, ...options } = settings
     if (api === "answer") {
+      const { default: Exa } = await import("exa-js")
       const client = new Exa(requireKey("exa", key))
       const answerOptions: Record<string, unknown> = pick(options, [
         "text",
@@ -69,6 +69,7 @@ export const exa = {
         ? pick(settings.contents ?? {}, ["text", "highlights", "snapshotAsOf"])
         : (settings.contents ?? {})
     if (settings.type === "lite" && isRecord(contents.text)) contents.text = pick(contents.text, ["maxCharacters"])
+    const { default: Exa } = await import("exa-js")
     const client = new Exa(key)
     const payload = await sdkRequest(signal, () =>
       client.search(queries[0], {

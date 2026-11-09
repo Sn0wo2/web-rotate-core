@@ -1,4 +1,3 @@
-import Exa from "exa-js"
 import { z } from "zod"
 import { stringValue } from "../../shared/config"
 import { requireKey, sdkRequest } from "../utils"
@@ -15,6 +14,7 @@ export const exa = {
   formats: ["markdown"],
   options: settingsSchema,
   run: async ({ settings, key, urls, signal, format, globals }) => {
+    const { default: Exa } = await import("exa-js")
     const client = new Exa(requireKey("exa", key))
     const payload = await sdkRequest(signal, () =>
       client.getContents(urls, {

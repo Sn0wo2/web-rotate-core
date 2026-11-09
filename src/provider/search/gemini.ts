@@ -1,5 +1,3 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google"
-import { generateText } from "ai"
 import { clamp } from "es-toolkit/math"
 import { z } from "zod"
 import { modelCallOptions, modelProviderOptions, modelSettingsSchema } from "../ai"
@@ -33,13 +31,15 @@ export const gemini = {
   weight: 54,
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
+    const [{ createGoogleGenerativeAI }, { generateText }] = await Promise.all([import("@ai-sdk/google"), import("ai")])
     const google = createGoogleGenerativeAI({
       apiKey: requireKey("gemini", key),
       ...(settings.baseUrl ? { baseURL: settings.baseUrl } : {}),
     })
+    const callOptions = await modelCallOptions(settings)
     const result = await sdkRequest(signal, (abortSignal) =>
       generateText({
-        ...modelCallOptions(settings),
+        ...callOptions,
         model: google(settings.model?.trim() || "gemini-2.5-flash"),
         system: searchInstructions(settings, clamp(globals.searchResults, 1, 100)),
         prompt: queries[0],

@@ -1,5 +1,3 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 import pkg from "../../package.json" with { type: "json" }
 import { REQUEST_TIMEOUT_MS, timedSignal } from "../shared/http"
@@ -14,6 +12,10 @@ export async function mcpCall(
   signal: AbortSignal,
   timeoutMs: number = REQUEST_TIMEOUT_MS,
 ): Promise<CallToolResult> {
+  const [{ Client }, { StreamableHTTPClientTransport, StreamableHTTPError }] = await Promise.all([
+    import("@modelcontextprotocol/sdk/client/index.js"),
+    import("@modelcontextprotocol/sdk/client/streamableHttp.js"),
+  ])
   const requestSignal = timedSignal(signal, timeoutMs)
   for (let attempt = 0; ; attempt++) {
     const client = new Client({ name: "web-rotate-core", version: pkg.version }, { capabilities: {} })

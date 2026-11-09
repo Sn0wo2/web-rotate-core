@@ -1,5 +1,3 @@
-import { createXai } from "@ai-sdk/xai"
-import { generateText } from "ai"
 import { clamp } from "es-toolkit/math"
 import { omit } from "es-toolkit/object"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
@@ -30,6 +28,7 @@ export const grok = {
   weight: 54,
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
+    const [{ createXai }, { generateText }] = await Promise.all([import("@ai-sdk/xai"), import("ai")])
     const client = createXai({
       apiKey: requireKey("grok", key),
       ...(settings.baseUrl ? { baseURL: settings.baseUrl } : {}),
@@ -51,9 +50,10 @@ export const grok = {
           }
         : {}),
     })
+    const callOptions = await modelCallOptions(settings)
     const result = await sdkRequest(signal, (abortSignal) =>
       generateText({
-        ...modelCallOptions(settings),
+        ...callOptions,
         model: client.responses(settings.model?.trim() || "grok-4.7"),
         system: searchInstructions(settings, clamp(globals.searchResults, 1, 100)),
         prompt: queries[0],

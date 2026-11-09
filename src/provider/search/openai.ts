@@ -1,5 +1,3 @@
-import { createOpenAI } from "@ai-sdk/openai"
-import { generateText } from "ai"
 import { clamp } from "es-toolkit/math"
 import { omit } from "es-toolkit/object"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
@@ -37,6 +35,7 @@ export const openai = {
   weight: 74,
   options: settingsSchema,
   run: async ({ settings, key, queries, signal, globals }) => {
+    const [{ createOpenAI }, { generateText }] = await Promise.all([import("@ai-sdk/openai"), import("ai")])
     const { filters, user_location, reasoning, return_token_budget } = settings
     const client = createOpenAI({
       apiKey: requireKey("openai", key),
@@ -58,9 +57,10 @@ export const openai = {
         : {}),
     })
     const selectedModel = settings.model?.trim() || "gpt-5-mini"
+    const callOptions = await modelCallOptions(settings)
     const result = await sdkRequest(signal, (abortSignal) =>
       generateText({
-        ...modelCallOptions(settings),
+        ...callOptions,
         model: client.responses(selectedModel),
         system: searchInstructions(settings, clamp(globals.searchResults, 1, 100)),
         prompt: queries[0],

@@ -1,4 +1,3 @@
-import { ScrapeConfig, ScrapflyClient } from "scrapfly-sdk"
 import { z } from "zod"
 import { TARGET_USER_AGENT } from "../../shared/http"
 import { requireKey, sdkRequest } from "../utils"
@@ -22,6 +21,7 @@ export const scrapfly = {
   formats: ["html", "markdown", "text"],
   options: settingsSchema,
   run: fetchOne<ScrapflyFetchSettings>(async ({ settings, key, url, signal, format, globals }) => {
+    const { ScrapeConfig, ScrapflyClient } = await import("scrapfly-sdk")
     const client = new ScrapflyClient({
       key: requireKey("scrapfly", key),
     })

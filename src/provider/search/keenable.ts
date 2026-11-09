@@ -1,6 +1,5 @@
 import { clamp } from "es-toolkit/math"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
-import { Keenable } from "keenable"
 import { sdkRequest } from "../utils"
 import type { SearchProvider } from "./types"
 import { searchResponse } from "./utils"
@@ -10,6 +9,7 @@ export const keenable = {
   weight: 60,
   keyless: true,
   run: async ({ settings, key, queries, signal, globals }) => {
+    const { Keenable } = await import("keenable")
     const response = await sdkRequest(signal, (requestSignal) =>
       new Keenable({
         apiKey: key ?? "",

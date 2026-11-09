@@ -1,4 +1,3 @@
-import { Hyperbrowser } from "@hyperbrowser/sdk"
 import get from "es-toolkit/compat/get"
 import { z } from "zod"
 import { stringValue } from "../../shared/config"
@@ -18,6 +17,7 @@ export const hyperbrowser = {
   formats: ["html", "markdown"],
   options: settingsSchema,
   run: fetchOne<HyperbrowserFetchSettings>(async ({ settings, key, url, signal, format, globals }) => {
+    const { Hyperbrowser } = await import("@hyperbrowser/sdk")
     const client = new Hyperbrowser({
       apiKey: requireKey("hyperbrowser", key),
       baseUrl: "https://api.hyperbrowser.ai",

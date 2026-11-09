@@ -1,5 +1,4 @@
 import type { generateText } from "ai"
-import { isStepCount } from "ai"
 import { camelCase } from "es-toolkit/string"
 import { z } from "zod"
 import { USER_AGENT } from "../shared/http"
@@ -22,7 +21,8 @@ export const modelSettingsSchema = z.looseObject({
   providerOptions: z.record(z.string(), z.json()).optional(),
 })
 
-export function modelCallOptions(settings: z.output<typeof modelSettingsSchema>) {
+export async function modelCallOptions(settings: z.output<typeof modelSettingsSchema>) {
+  const { isStepCount } = await import("ai")
   return {
     maxOutputTokens: settings.max_output_tokens ?? 2048,
     maxRetries: 0,

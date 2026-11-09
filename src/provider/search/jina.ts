@@ -2,7 +2,6 @@ import get from "es-toolkit/compat/get"
 import { clamp } from "es-toolkit/math"
 import { pick } from "es-toolkit/object"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
-import { lexer, walkTokens } from "marked"
 import { z } from "zod"
 import { stringValue } from "../../shared/config"
 import { apiJSON } from "../../shared/http"
@@ -48,11 +47,13 @@ export const jina = {
         ?.replace(/<think>[\s\S]*?<\/think>/g, "")
         .trim()
       const sources: SearchResult[] = []
-      if (answer)
+      if (answer) {
+        const { lexer, walkTokens } = await import("marked")
         void walkTokens(lexer(answer.replace(/^\[\^[^\]]+\]:[\t ]*/gm, "")), (part) => {
           if (part.type === "link")
             sources.push({ url: part.href, ...(part.text !== part.href ? { title: part.text } : {}) })
         })
+      }
       return answerResponse(payload, sources, answer)
     }
     const endpoint = urlParams(new URL("https://s.jina.ai"), {

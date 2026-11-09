@@ -1,7 +1,6 @@
 import get from "es-toolkit/compat/get"
 import { clamp } from "es-toolkit/math"
 import { isPlainObject as isRecord } from "es-toolkit/predicate"
-import { createParser } from "eventsource-parser"
 import { z } from "zod"
 import { stringValue } from "../../shared/config"
 import { apiJSON, checkedResponseText, timedSignal, USER_AGENT } from "../../shared/http"
@@ -40,6 +39,7 @@ export const brave = {
       })
       const body = await checkedResponseText(response, "brave")
       let answerText = ""
+      const { createParser } = await import("eventsource-parser")
       const parser = createParser({
         onEvent: (event) => {
           if (!event.data || event.data === "[DONE]") return
