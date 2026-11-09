@@ -52,6 +52,7 @@
 - [Linkup](https://www.linkup.so)
 - [Tavily](https://www.tavily.com) `Keyless`
 - [Serper](https://serper.dev)
+- [SearXNG](https://docs.searxng.org) `Keyless`
 - [Keenable](https://keenable.ai) `Keyless`
 - [Zhipu](https://open.bigmodel.cn)
 - [Jina](https://jina.ai)

@@ -47,7 +47,7 @@ See [all 9 combinations, task scope, and scoring](sources/vals.md). Vals percent
 
 ## Project coverage and missing scores
 
-At this snapshot, WebSearch registers **27 external providers plus `native`**. AA's methodology table covers **14/27** of those providers; the public scores obtained during the review cover **10/27**.
+At this snapshot, WebSearch registers **28 external providers plus `native`**. AA's methodology table covers **14/28** of those providers; the public scores obtained during the review cover **10/28**.
 
 | Project ID     | External evidence at this snapshot                                                                                   |
 | -------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -68,6 +68,7 @@ At this snapshot, WebSearch registers **27 external providers plus `native`**. A
 | `claude`       | Not covered by the reviewed AA configuration table                                                                   |
 | `gemini`       | Not covered by the reviewed AA configuration table                                                                   |
 | `zhipu`        | Not covered by the reviewed AA configuration table                                                                   |
+| `searxng`      | Self-hosted; not covered by the reviewed AA configuration table                                                      |
 | `native`       | Local implementation; the sources above do not independently evaluate this project's implementation                  |
 
 This project's `native` is neither Vals' Native nor AA's no-search model baseline. Brand coverage also does not establish that project defaults were tested: Parallel's default `fast` cannot inherit the `advanced` score, and Perplexity's default `low` cannot inherit the `medium` score.

@@ -21,6 +21,7 @@ import { openai } from "./openai"
 import { parallel } from "./parallel"
 import { perplexity } from "./perplexity"
 import { scrapingbee } from "./scrapingbee"
+import { searxng } from "./searxng"
 import { serper } from "./serper"
 import { tavily } from "./tavily"
 import { tinyfish } from "./tinyfish"
@@ -43,6 +44,7 @@ export const SEARCH_PROVIDERS = [
   tinyfish as Registered<typeof tinyfish, "tinyfish">,
   keenable as Registered<typeof keenable, "keenable">,
   serper as Registered<typeof serper, "serper">,
+  searxng as Registered<typeof searxng, "searxng">,
   bocha as Registered<typeof bocha, "bocha">,
   jina as Registered<typeof jina, "jina">,
   scrapingbee as Registered<typeof scrapingbee, "scrapingbee">,
